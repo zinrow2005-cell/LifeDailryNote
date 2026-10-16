@@ -1,5 +1,7 @@
-/* 拾光記帳 v1.6.2 — local-first, zero runtime dependencies. No personal data is bundled. */
+
+/* 拾光記帳 v1.8.0 — local-first, zero runtime dependencies. No personal data is bundled. */
 (()=>{'use strict';
+const DAYBOOK_SYNC_MODE = 'local-only'; // GitHub 本機版，不使用 iframe 或雲端 API
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const CATS=[['飲食','🍜','#8e76ed','#f0edff'],['其他雜費','🛒','#e99a67','#fff1e9'],['小孩相關','🧸','#df7ba3','#fff0f6'],['醫藥費','💊','#31aa9a','#e5f9f3'],['交通','🚗','#5099d8','#e8f3ff'],['保險費','🛡️','#d69b4c','#fff6e4'],['電費','⚡','#eeac4d','#fff6e4'],['GOGORO','🛵','#5fafd4','#e7f5ff'],['水費','💧','#5caff5','#e9f5ff'],['電信費','📱','#837ddf','#f0efff'],['旅遊費','✈️','#e78380','#fff0eb'],['衣服','👕','#a67dcb','#f7eeff'],['未分類','📌','#8490a5','#f0f3f8']];
 const PALETTE=['#8978ea','#26bca6','#efad78','#70a9ed','#ef8c9e','#b792d7','#e2b95f','#73bdcc','#b9a37d','#7ec18c','#d68ebc','#9eabd0'];
@@ -213,158 +215,14 @@ async function resolvePlannerConflict(id,choice){
  toast(choice==='local'?'已排入本機版本待重新上傳':'已採用雲端版本');cloudSync?.scheduleSync(true);
 }
 
-/* Cloud sync V1.1. All credentials are entered by the site owner; never ship service_role keys.
-   The cloud is opt-in. Browser IndexedDB remains the primary offline cache. */
-/* V1.6 Google Sheets / Apps Script bridge. The GitHub Pages site remains local-first.
- * Requests pass through a user-supplied, allowlisted Apps Script HTMLService iframe.
- * This avoids unsupported cross-origin fetch/CORS patterns. No key is bundled.
- */
+/* V1.8.0 GitHub local-only mode. */
 class CloudSync {
- constructor(){this.config=null;this.key='';this.busy=false;this.state='local';this.message='本機模式 · 尚未連接 Google 試算表';this.lastSync=null;this.frame=null;this.loaded=null;this.waiting=new Map();this.timer=null;this.debounce=null;this.channel=guid();this.bridgeTarget=null;this.bridgeReady=false;this.entryVersions={};this.catVersion=0;this.entryConflicts=new Map();this.catConflict=null;}
- async init(){this.config=await getMeta('gsheet_config');this.key=await getMeta('gsheet_key')||'';this.lastSync=await getMeta('gsheet_last_sync');this.entryVersions=await getMeta('gsheet_entry_versions')||{};this.catVersion=Number(await getMeta('gsheet_cat_version')||0);if(this.config){$('#cloudUrl').value=this.config.url;$('#cloudKey').placeholder='已儲存金鑰；如不更換可留空';}this.renderUI();this.updateKeyHint();if(this.config&&this.key&&navigator.onLine&&this.lastSync)this.scheduleSync(true);
-  window.addEventListener('online',()=>{if(this.lastSync)this.scheduleSync(true);});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&this.lastSync)this.scheduleSync(true);});this.timer=setInterval(()=>{if(!document.hidden&&this.lastSync)this.scheduleSync(true);},90000);
-  window.addEventListener('message',e=>{
-    if(!this.frame||!this.googleBridgeOrigin(e.origin)||!this.isBridgeWindow(e.source))return;
-    const d=e.data;if(!d)return;
-    if(d.type==='daybook-gas-ready'&&d.bridgeVersion==='1.6.2'){
-      this.bridgeReady=true;this.bridgeTarget=e.source;
-      // A Google HtmlService app is usually nested in one or more sandbox frames.
-      // Send any pending message to the real user-code frame, not just the outer wrapper.
-      if(this.pendingRequest)this.sendBridgeMessage(this.pendingRequest);
-      return;
-    }
-    if(d.type!=='daybook-gas-response'||d.channel!==this.channel)return;
-    const w=this.waiting.get(d.id);if(!w)return;
-    this.waiting.delete(d.id);clearTimeout(w.timer);this.pendingRequest=null;
-    d.ok?w.resolve(d.value):w.reject(Error(d.value?.message||'Apps Script 發生錯誤'));
-  });
- }
- bind(){
-  $('#cloudConfigForm').addEventListener('submit',async e=>{e.preventDefault();try{await this.configure($('#cloudUrl').value.trim(),this.cleanKey($('#cloudKey').value));await this.diagnose();toast('連線驗證成功，開始同步帳目');await this.sync();}catch(err){if(!err.daybookReported)this.showError(err);}});
-  $('#cloudDiagnose').onclick=async()=>{try{await this.configure($('#cloudUrl').value.trim(),this.cleanKey($('#cloudKey').value));await this.diagnose();}catch(err){if(!err.daybookReported)this.showError(err);}};
-  $('#cloudKey').addEventListener('input',()=>this.updateKeyHint());
-  $('#cloudSyncNow').onclick=()=>this.sync().catch(err=>this.showError(err));
-  $('#cloudLogout').onclick=async()=>{if(!confirm('停用此裝置的 Google 試算表同步？本機帳目仍保留。'))return;this.config=null;this.key='';this.frame?.remove();this.frame=null;this.loaded=null;this.bridgeReady=false;this.bridgeTarget=null;this.pendingRequest=null;for(const w of this.waiting.values()){clearTimeout(w.timer);w.reject(Error('已取消連線'));}this.waiting.clear();await setMeta('gsheet_config',null);await setMeta('gsheet_key',null);this.state='local';this.message='已停用此裝置同步 · 本機記帳仍可使用';this.renderUI();};
-  const box=$('#entryConflictList');box?.addEventListener('click',e=>{const b=e.target.closest('[data-entry-choice]');if(b)this.resolveConflict(b.dataset.entryId,b.dataset.entryChoice).catch(err=>this.showError(err));});
- }
- validUrl(url){url=url.replace(/\/+$/,'');if(!/^https:\/\/script\.google\.com\/macros\/s\/[a-z0-9_-]+\/exec$/i.test(url))throw Error('請填寫你自己部署的 Apps Script Web App /exec 網址');return url;}
- async configure(url,key){url=this.validUrl(url);if(!key)key=this.key;if(!/^[a-f0-9]{64}$/i.test(key))throw Error('請貼上 setupDaybook 產生的 64 碼同步金鑰');if(this.config&&this.config.url!==url&&!confirm('你正在更換雲端試算表。建議先下載 JSON 備份。要繼續嗎？'))return;
-  const newId='gapps:'+url.split('/').slice(-2)[0];
-  if(linkedUserId!==newId){const old=linkedUserId;linkedUserId=newId;await setMeta('linked_user',newId);this.entryVersions={};this.catVersion=0;plannerVersions={};await setMeta('gsheet_entry_versions',{});await setMeta('gsheet_cat_version',0);await setMeta('planner_sync_versions_v15',{});await setMeta('gsheet_bootstrap_'+newId,false);await setMeta('cloud_categories_dirty',Boolean(records.length||plannerItems(planner).size));
-    // Existing records are queued on FIRST connection, so none are silently discarded.
-    for(const r of records)await storeOne('outbox',{id:r.id,deleted:false,payload:r,change_id:guid()});
-    for(const [id,payload] of plannerItems(planner))await storeOne('planner_outbox',{id,deleted:false,payload,base_version:0,change_id:guid()});
-    if(old&&old!==newId)toast('已切換同步服務，請先檢查是否有舊版未同步資料');
-  }
-  this.config={url};this.key=key;await setMeta('gsheet_config',this.config);await setMeta('gsheet_key',key);$('#cloudKey').value='';this.updateKeyHint();this.resetBridge();this.state='configured';this.message='已設定 Google Apps Script · 可以進行連線測試';this.renderUI();
- }
- cleanKey(value){return String(value||'').replace(/\s+/g,'');}
- updateKeyHint(){const raw=$('#cloudKey').value, key=this.cleanKey(raw), hint=$('#cloudKeyHint');if(!hint)return;hint.className='cloud-key-hint';if(!key){hint.textContent=this.key?'已保存同步金鑰；留空將繼續沿用。':'尚未輸入金鑰。請從 Apps Script 執行記錄複製完整 64 碼。';return;}if(key.length!==64){hint.classList.add('error');hint.textContent=`目前 ${key.length} / 64 碼。請確認沒有複製到說明文字或漏掉字元。`;return;}if(!/^[a-f0-9]{64}$/i.test(key)){hint.classList.add('error');hint.textContent='長度是 64，但包含非 0–9／a–f 字元，請重新複製。';return;}hint.classList.add('ok');hint.textContent='✓ 金鑰長度與格式正確（尚未驗證伺服器是否接受）';}
- diagMessage(msg,type=''){const el=$('#cloudDiagResult');if(el){el.textContent=msg;el.className='cloud-diag-result'+(type?' '+type:'');}}
- googleBridgeOrigin(origin){try{const u=new URL(origin);return u.protocol==='https:'&&(u.hostname==='script.google.com'||u.hostname==='script.googleusercontent.com'||u.hostname.endsWith('.googleusercontent.com'));}catch{return false;}}
- // Cross-origin WindowProxy exposes frame indices even though it hides document contents.
- isBridgeWindow(source){if(!source||!this.frame)return false;const walk=(w,depth)=>{if(w===source)return true;if(depth>=5)return false;try{for(let i=0;i<Math.min(w.frames.length,16);i++)if(walk(w.frames[i],depth+1))return true;}catch{}return false;};return walk(this.frame.contentWindow,0);}
- sendBridgeMessage(data){
-   if(!this.frame)return;
-   // The explicit ready message is the preferred route.
-   if(this.bridgeTarget){try{this.bridgeTarget.postMessage(data,'*');return;}catch{this.bridgeTarget=null;}}
-   // Fallback for load-order races: traverse only descendants of OUR iframe.
-   const send=(w,depth)=>{if(depth>5)return;try{w.postMessage(data,'*');}catch{}try{for(let i=0;i<Math.min(w.frames.length,16);i++)send(w.frames[i],depth+1);}catch{}};
-   send(this.frame.contentWindow,0);
- }
- resetBridge(){if(this.frame){this.frame.remove();this.frame=null;}this.loaded=null;this.bridgeTarget=null;this.bridgeReady=false;this.pendingRequest=null;for(const [id,w] of this.waiting){clearTimeout(w.timer);w.reject(Error('同步通道已重置，請重新測試'));}this.waiting.clear();}
- async diagnose(){if(this.busy)throw Error('目前正進行其他同步作業，請稍後再試');this.busy=true;this.state='busy';this.message='診斷中：只進行 Google 連線測試，不上傳或修改任何帳目';this.diagMessage('檢查 1/3：驗證網址與 64 碼金鑰格式…');this.renderUI();try{
-  this.validUrl(this.config?.url||'');if(!/^[a-f0-9]{64}$/i.test(this.key||''))throw Error('同步金鑰格式錯誤；請重新貼上完整 64 碼（0–9、a–f）');
-  this.diagMessage('檢查 2/3：載入 Google Apps Script 網頁橋接…');
-  const reply=await this.ping();if(!reply?.ok)throw Error('Google 服務有回應，但沒有回傳驗證成功訊息');
-  this.busy=false;this.state='ready';this.message='Google 連線測試成功 ✓（尚未讀寫帳目）';this.diagMessage('✓ 連線成功：Google Apps Script 已接收請求並通過金鑰驗證。現在可以按「儲存並開始同步」上傳帳目。','ok');this.renderUI();return true;
- }catch(e){this.busy=false;this.diagMessage('連線測試失敗：'+String(e.message||e),'error');this.showError(e);e.daybookReported=true;throw e;}}
- async bridgeRequest(action,extra={}){
-  if(!navigator.onLine)throw Error('目前離線，帳目已儲存在本機，恢復連線後再同步');
-  if(!this.config||!this.key)throw Error('請先設定 Apps Script 網址和同步金鑰');
-  if(!this.frame){
-   const frame=document.createElement('iframe');frame.title='拾光記帳雲端同步橋接';frame.setAttribute('aria-hidden','true');frame.style.cssText='position:fixed;left:-100px;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
-   this.frame=frame;this.loaded=new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('階段2：Apps Script 頁面 20 秒內未載入；請確認 /exec 網址、權限設為「任何人」，並開啟網址檢查')),20000);frame.onload=()=>{clearTimeout(timer);resolve();};frame.onerror=()=>{clearTimeout(timer);reject(Error('階段2：Apps Script 頁面無法載入；請檢查網址與部署存取權限'));};});
-   frame.src=this.config.url;document.body.appendChild(frame);
-  }
-  try{await this.loaded;}catch(e){this.resetBridge();throw e;}
-  const id=guid(),request={action,key:this.key,...extra};
-  return new Promise((resolve,reject)=>{
-   const timeout=action==='ping'?20000:60000;
-   const timer=setTimeout(()=>{
-     this.waiting.delete(id);
-     const reason=!this.bridgeReady
-       ?'階段3：未收到 V1.6.2 Google 橋接的「已啟動」訊息。請確認 Bridge.html 已更新且部署新版本；也可能是 Google 不允許第三方 iframe 嵌入。'
-       :'階段4：已收到 V1.6.2 橋接啟動訊息，但 Google 服務未在時限內回應。請檢查 Apps Script「執行項目」是否有 daybookApi 執行失敗，並檢查瀏覽器 Cookie／權限。';
-     this.resetBridge();reject(Error(reason));
-   },timeout);
-   this.waiting.set(id,{resolve,reject,timer});
-   this.pendingRequest={type:'daybook-gas-request',id,channel:this.channel,request};
-   this.sendBridgeMessage(this.pendingRequest);
-  }).catch(err=>{const msg=String(err.message||err);if(msg.includes('同步金鑰不正確，或尚未執行 setupDaybook'))throw Error('階段3：Google 已回應，但金鑰被拒絕。請確認使用最近一次 setupDaybook 產生的金鑰，並確認 /exec 屬於同一個 Apps Script 專案。');throw err;});
- }
- async ping(){return this.bridgeRequest('ping');}
- async pull(){const r=await this.bridgeRequest('pull');if(!r?.ok||!Array.isArray(r.records)||!Array.isArray(r.planner)||!Array.isArray(r.meta))throw Error('試算表同步回傳格式不正確');return r;}
- async push(changes){if(!changes.length)return [];const out=[];for(let i=0;i<changes.length;i+=65){this.message=`正在上傳到 Google 試算表 ${Math.min(i+65,changes.length)} / ${changes.length} 筆…`;this.renderUI();const r=await this.bridgeRequest('push',{changes:changes.slice(i,i+65)});if(!r?.ok||!Array.isArray(r.results))throw Error('寫入試算表失敗，沒有收到確認');out.push(...r.results);}return out;}
- scheduleSync(immediate=false){if(!this.config||!this.key||this.busy||!navigator.onLine||(!this.lastSync&&this.state!=='ready'))return;clearTimeout(this.debounce);this.debounce=setTimeout(()=>this.sync().catch(e=>this.showError(e)),immediate?200:2000);}
- showError(err){console.warn('Daybook Google Sheets sync',err);this.busy=false;this.state='error';this.message='同步失敗：'+String(err.message||err).slice(0,180)+'（本機資料仍保留）';this.renderUI();toast(this.message);}
- updateMiniStatus(){const el=$('#syncMiniStatus');if(!el)return;el.textContent=this.busy?'☁ Google 試算表同步中…':this.config?(this.state==='error'?'⚠ 試算表同步異常 · 本機安全':this.lastSync?'☁ Google 試算表已同步':'☁ Google 試算表待同步'):'☁ 本機模式';}
- renderUI(){const ready=Boolean(this.config&&this.key);const el=$('#cloudState');if(!el)return;el.className='cloud-state '+(this.state==='error'?'error':this.busy?'busy':ready?'ready':'');el.textContent=this.message+(this.lastSync&&ready?' ｜ 最近成功：'+new Date(this.lastSync).toLocaleString('zh-TW'):'');$('#cloudAccountInfo').textContent=ready?'Google 試算表已設定 · '+records.length+' 筆本機記帳 · 離線可繼續使用':'未連接雲端 · 記帳只儲存在這個裝置';$('#cloudSyncNow').disabled=!ready||this.busy;$('#cloudLogout').disabled=!ready||this.busy;$('#cloudConfigForm').querySelector('button[type="submit"]').disabled=this.busy;$('#cloudDiagnose').disabled=this.busy;this.updateMiniStatus();this.renderConflicts();}
- renderConflicts(){const el=$('#entryConflictList');if(!el)return;let rows=[...this.entryConflicts.values()].map(c=>({id:c.id,name:c.local?.note||c.local?.category||'記帳 '+c.id.slice(0,8)}));if(this.catConflict)rows.push({id:'meta:categories',name:'分類管理設定'});el.innerHTML=rows.length?'<h3>需要確認的記帳／分類衝突</h3>'+rows.map(c=>`<div class="sync-conflict-row"><b>${esc(c.name)}</b><div class="setting-actions"><button type="button" class="button button-outline" data-entry-id="${esc(c.id)}" data-entry-choice="cloud">使用雲端</button><button type="button" class="button button-primary" data-entry-id="${esc(c.id)}" data-entry-choice="local">保留本機並上傳</button></div></div>`).join(''):'<p class="muted">目前沒有待處理的交易／分類衝突。</p>';}
- async resolveConflict(id,choice){if(id==='meta:categories'){
-   const info=this.catConflict;if(!info)return;
-   if(choice==='cloud'){cats={...DEF_CATS,...(info.remote?.payload||{})};await storeOne('meta',{key:'categories',value:cats});await setMeta('cloud_categories_dirty',false);refreshCatSelectors();}
-   else {this.catVersion=Number(info.remote?.version||0);await setMeta('gsheet_cat_version',this.catVersion);}
-   this.catConflict=null;
-  } else {
-   const info=this.entryConflicts.get(id);if(!info)return;
-   if(choice==='cloud'){await storeDelete('outbox',id);const data=info.remote;if(data&&!data.deleted&&data.payload){const r=validateRecord(data.payload);if(r)await storeOne('records',r);}else await storeDelete('records',id);records=await getAll('records');}
-   else {const o=(await getAll('outbox')).find(x=>x.id===id);if(o)await storeOne('outbox',{...o,change_id:guid()});this.entryVersions[id]=Number(info.remote?.version||0);await setMeta('gsheet_entry_versions',this.entryVersions);}
-   this.entryConflicts.delete(id);
-  }
-  render();this.renderConflicts();toast(choice==='cloud'?'已採用雲端設定':'本機版本已準備重新上傳');this.scheduleSync(true);
- }
- async sync(){if(!this.config||!this.key||this.busy)return;this.busy=true;this.state='busy';this.message='正在與 Google 試算表核對資料…';this.renderUI();try{
-   await this.ping();let snap=await this.pull();const recMap=new Map(snap.records.map(x=>[x.id,x])),planMap=new Map(snap.planner.map(x=>[x.id,x])),catRow=snap.meta.find(x=>x.id==='categories');
-   // Newly linked browsers and older versions: bootstrap local unmatched records.
-   const pending=new Map((await getAll('outbox')).map(x=>[x.id,x]));
-   for(const r of records){if(pending.has(r.id))continue;const remote=recMap.get(r.id);if(!remote){const c={id:r.id,payload:r,deleted:false,change_id:guid()};await storeOne('outbox',c);pending.set(r.id,c);}else if(!plannerEqual(r,remote.payload)||remote.deleted){if(!Object.prototype.hasOwnProperty.call(this.entryVersions,r.id)){const c={id:r.id,payload:r,deleted:false,change_id:guid()};await storeOne('outbox',c);pending.set(r.id,c);}}}
-   const plans=plannerItems(planner),planPending=new Map((await getAll('planner_outbox')).map(x=>[x.id,x]));
-   for(const [id,payload] of plans){if(planPending.has(id))continue;const remote=planMap.get(id);if(!remote){const p={id,payload,deleted:false,base_version:0,change_id:guid()};await storeOne('planner_outbox',p);planPending.set(id,p);}else if(!plannerEqual(payload,remote.payload)&&!Object.prototype.hasOwnProperty.call(plannerVersions,id)){const p={id,payload,deleted:false,base_version:0,change_id:guid()};await storeOne('planner_outbox',p);planPending.set(id,p);}}
-   const changes=[];
-   for(const p of pending.values())if(!this.entryConflicts.has(p.id))changes.push({kind:'records',id:p.id,payload:p.payload,deleted:p.deleted,baseVersion:Number(this.entryVersions[p.id]||0),change_id:p.change_id});
-   for(const p of planPending.values())if(!plannerConflicts.has(p.id))changes.push({kind:'planner',id:p.id,payload:p.payload,deleted:p.deleted,baseVersion:Number(p.base_version||0),change_id:p.change_id});
-   const catDirty=Boolean(await getMeta('cloud_categories_dirty'));
-   if(catDirty&&!this.catConflict)changes.push({kind:'meta',id:'categories',payload:cats,deleted:false,baseVersion:this.catVersion});
-   const answers=await this.push(changes);
-   for(const a of answers){const source=changes.find(c=>c.kind===a.kind&&c.id===a.id);if(!source)continue;
-    if(a.kind==='records'){
-      if(a.status==='ok'){this.entryVersions[a.id]=a.version;await clearOutboxIfUnchanged([{id:a.id,change_id:source.change_id}]);this.entryConflicts.delete(a.id);}
-      else this.entryConflicts.set(a.id,{id:a.id,remote:a.remote,local:source.payload});
-    }else if(a.kind==='planner'){
-      if(a.status==='ok'){plannerVersions[a.id]=a.version;await clearPlannerQueueIfMatch(source);plannerConflicts.delete(a.id);}
-      else plannerConflicts.set(a.id,{id:a.id,remote:a.remote});
-    }else if(a.kind==='meta'){
-      if(a.status==='ok'){this.catVersion=a.version;await setMeta('cloud_categories_dirty',false);this.catConflict=null;}
-      else this.catConflict={remote:a.remote};
-    }
-   }
-   await setMeta('gsheet_entry_versions',this.entryVersions);await setMeta('planner_sync_versions_v15',plannerVersions);await setMeta('gsheet_cat_version',this.catVersion);
-   // Re-pull after successful writes and overlay pending local changes before replacing IndexedDB.
-   snap=await this.pull();const newCat=snap.meta.find(x=>x.id==='categories');
-   if(newCat&&!await getMeta('cloud_categories_dirty')&&!this.catConflict){this.catVersion=newCat.version;cats={...DEF_CATS,...(newCat.payload||{})};await storeOne('meta',{key:'categories',value:cats});await setMeta('gsheet_cat_version',this.catVersion);}
-   const remain=await getAll('outbox');const dirtyRecIds=new Set(remain.map(x=>x.id));
-   for(const row of snap.records)if(!dirtyRecIds.has(row.id))this.entryVersions[row.id]=row.version;
-   await setMeta('gsheet_entry_versions',this.entryVersions);
-   const remoteForView=snap.records.map(x=>({entry_id:x.id,payload:x.payload,deleted:x.deleted}));await loadRemoteSnapshot(remoteForView);
-   const dirtyPlans=new Map((await getAll('planner_outbox')).map(x=>[x.id,x]));let merged=planner;
-   for(const row of snap.planner){if(dirtyPlans.has(row.id))continue;merged=plannerWithItem(merged,row.id,row.payload,row.deleted);plannerVersions[row.id]=row.version;}
-   if(!plannerEqual(merged,planner)){planner=sanitizePlanner(merged);await setMeta('planner_v14',planner);}
-   await setMeta('planner_sync_versions_v15',plannerVersions);
-   if(view==='planner')renderPlanner();renderDashboardBudget();renderPlannerSyncState();
-   this.lastSync=new Date().toISOString();await setMeta('gsheet_last_sync',this.lastSync);this.state=this.entryConflicts.size||plannerConflicts.size||this.catConflict?'error':'ready';this.message=`同步完成 · 交易 ${records.length} 筆 · 待傳 ${remain.length} 筆 · 設定待傳 ${(await getAll('planner_outbox')).length} 項`+(this.state==='error'?' · 有版本衝突待確認':'');this.busy=false;this.renderUI();
-  }catch(err){this.showError(err);throw err;}
- }
+  constructor(){this.state='local';this.message='GitHub 本機模式 · 無自動雲端同步';}
+  bind(){const b=document.getElementById('githubBackupShortcut');if(b)b.addEventListener('click',()=>exportJson());}
+  async init(){this.updateMiniStatus();}
+  updateMiniStatus(){const el=document.getElementById('syncMiniStatus');if(el)el.textContent='● GitHub 本機版 · 資料不會自動同步';}
+  renderUI(){this.updateMiniStatus();}
+  scheduleSync(){} // Google 雲端記帳必須使用 Apps Script 直連版
 }
 
 
@@ -429,8 +287,9 @@ $('#entryFrequent').addEventListener('click',e=>{const b=e.target.closest('[data
 $('#entryRecentCategories').addEventListener('click',e=>{const b=e.target.closest('[data-quick-category]');if(b){$('#entryCategory').value=b.dataset.quickCategory;$('#entryNote').focus();}});
 $('#main').addEventListener('click',e=>{const target=e.target.closest('[data-report-cat],[data-report-month],[data-report-year],[data-yoy-cat],[data-edit],[data-delete],[data-duplicate],[data-cat-edit],[data-empty-action],[data-go]');if(!target)return;if(target.hasAttribute('data-report-cat')){const [start,end]=analyticsBounds();openReportDetail({kind:'category',category:target.dataset.reportCat,start,end},target);return;}if(target.hasAttribute('data-yoy-cat')){const {start,end}=yoyScope();openReportDetail({kind:'category',category:target.dataset.yoyCat,start,end},target);return;}if(target.hasAttribute('data-report-month')){const month=target.dataset.reportMonth,[a,b]=analyticsBounds(),start=month+'-01',end=endMonth(start);openReportDetail({kind:'month',month,start:a>start?a:start,end:b<end?b:end},target);return;}if(target.hasAttribute('data-report-year')){const year=Number(target.dataset.reportYear),[a,b]=analyticsBounds(),start=`${year}-01-01`,end=`${year}-12-31`;openReportDetail({kind:'year',year,start:a>start?a:start,end:b<end?b:end},target);return;}if(target.dataset.edit)openModal(target.dataset.edit);else if(target.dataset.duplicate)duplicateEntry(target.dataset.duplicate);else if(target.dataset.delete)removeEntry(target.dataset.delete);else if(target.dataset.catEdit)categoryModal(target.dataset.catEdit);else if(target.dataset.emptyAction)navigate(target.dataset.emptyAction);else if(target.dataset.go)navigate(target.dataset.go);});document.addEventListener('keydown',e=>{if(e.key==='Escape'){const opened=$$('.modal-layer.open');if(opened.length)closeModal(opened.find(x=>x.id==='entryModal')?.id||opened.find(x=>x.id==='categoryModal')?.id||opened.at(-1).id);}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();navigate('transactions');$('#searchText').focus();}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'&&$('#entryModal').classList.contains('open')){e.preventDefault();$('#entryForm').requestSubmit();}});
 }
-async function init(){try{db=await idb;records=(await getAll('records')).map(validateRecord).filter(Boolean);const meta=await getAll('meta');const stored=meta.find(x=>x.key==='categories');linkedUserId=meta.find(x=>x.key==='linked_user')?.value||null;planner=sanitizePlanner(meta.find(x=>x.key==='planner_v14')?.value);plannerVersions=meta.find(x=>x.key==='planner_sync_versions_v15')?.value||{};budgetMonth=today().slice(0,7);$('#budgetMonth').value=budgetMonth;if(stored?.value&&typeof stored.value==='object')cats={...DEF_CATS,...stored.value};records.forEach(r=>{if(!cats[r.category])cats[r.category]={emoji:'📌',color:'#7983b0',bg:'#f1f1fa'}});}
+async function init(){try{db=await idb;records=(await getAll('records')).map(validateRecord).filter(Boolean);const meta=await getAll('meta');const stored=meta.find(x=>x.key==='categories');linkedUserId=null; /* GitHub 本機版不啟用舊雲端 outbox */planner=sanitizePlanner(meta.find(x=>x.key==='planner_v14')?.value);plannerVersions=meta.find(x=>x.key==='planner_sync_versions_v15')?.value||{};budgetMonth=today().slice(0,7);$('#budgetMonth').value=budgetMonth;if(stored?.value&&typeof stored.value==='object')cats={...DEF_CATS,...stored.value};records.forEach(r=>{if(!cats[r.category])cats[r.category]={emoji:'📌',color:'#7983b0',bg:'#f1f1fa'}});}
 catch(e){console.error('IndexedDB unavailable',e);alert('目前瀏覽器無法使用本機資料庫。請改用 HTTPS 網站開啟、確認不是無痕模式，並允許網站儲存空間。');return;}
-if(window.matchMedia?.('(max-width:620px)').matches)$('#budgetCategoriesDetails').open=false;$('#currentDate').textContent=new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'short'});$('#entryDate').value=today();refreshCatSelectors();yearsApplyInit();bind();await cloudSync.init();render();renderPlannerSyncState();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(console.warn);}
+if(window.matchMedia?.('(max-width:620px)').matches)$('#budgetCategoriesDetails').open=false;$('#currentDate').textContent=new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'short'});$('#entryDate').value=today();refreshCatSelectors();yearsApplyInit();bind();await cloudSync.init();render();renderPlannerSyncState();if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(console.warn);}}
 init();
 })();
+

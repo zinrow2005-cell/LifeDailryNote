@@ -1,5 +1,5 @@
 {
-  "name": "拾光記帳 | Daybook",
+  "name": "拾光記帳 Daybook V1.8.0 本機版",
   "short_name": "拾光記帳",
   "description": "自己的日常收支、分類、快速搜尋與跨年度統計、每月預算與固定收支",
   "start_url": "./index.html",
@@ -9,7 +9,17 @@
   "theme_color": "#14213c",
   "lang": "zh-Hant-TW",
   "icons": [
-    {"src":"icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
-    {"src":"icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
