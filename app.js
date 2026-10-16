@@ -1,4 +1,4 @@
-/* 拾光記帳 v1.5 — local-first, zero runtime dependencies. No personal data is bundled. */
+/* 拾光記帳 v1.6 — local-first, zero runtime dependencies. No personal data is bundled. */
 (()=>{'use strict';
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const CATS=[['飲食','🍜','#8e76ed','#f0edff'],['其他雜費','🛒','#e99a67','#fff1e9'],['小孩相關','🧸','#df7ba3','#fff0f6'],['醫藥費','💊','#31aa9a','#e5f9f3'],['交通','🚗','#5099d8','#e8f3ff'],['保險費','🛡️','#d69b4c','#fff6e4'],['電費','⚡','#eeac4d','#fff6e4'],['GOGORO','🛵','#5fafd4','#e7f5ff'],['水費','💧','#5caff5','#e9f5ff'],['電信費','📱','#837ddf','#f0efff'],['旅遊費','✈️','#e78380','#fff0eb'],['衣服','👕','#a67dcb','#f7eeff'],['未分類','📌','#8490a5','#f0f3f8']];
@@ -199,102 +199,118 @@ function plannerItemName(id){if(id.startsWith('budget:'))return id.slice(7)+' �
 function plannerWithItem(base,id,value,deleted){const next={budgets:{...base.budgets},recurring:base.recurring.slice()};if(id.startsWith('budget:')){const month=id.slice(7);if(deleted)delete next.budgets[month];else next.budgets[month]=value;}else if(id.startsWith('recurring:')){const rid=id.slice(10);next.recurring=next.recurring.filter(r=>r.id!==rid);if(!deleted)next.recurring.push(value);}return sanitizePlanner(next);}
 async function clearPlannerQueueIfMatch(item){const db=await idb;return new Promise((resolve,reject)=>{const tx=db.transaction('planner_outbox','readwrite'),st=tx.objectStore('planner_outbox'),r=st.get(item.id);r.onsuccess=()=>{if(r.result?.change_id===item.change_id)st.delete(item.id);};tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
 function renderPlannerSyncState(){const area=$('#plannerSyncStatus'),list=$('#plannerConflictList');if(!area||!list)return;const conflicts=[...plannerConflicts.values()],waitingText=linkedUserId?'已啟用帳號同步':'本機模式';const update=async()=>{const pending=(await getAll('planner_outbox')).length;area.textContent=`${waitingText} · 待同步設定 ${pending} 項 · 需處理衝突 ${conflicts.length} 項`;};update().catch(()=>{});list.innerHTML=conflicts.length?conflicts.map(c=>`<article class="sync-conflict-row"><div><b>${esc(plannerItemName(c.id))}</b><p>本機與雲端都修改了同一設定，本機值仍保留。請選擇要採用的版本。</p></div><div class="setting-actions"><button type="button" class="button button-outline" data-planner-choice="cloud" data-planner-id="${esc(c.id)}">使用雲端</button><button type="button" class="button button-primary" data-planner-choice="local" data-planner-id="${esc(c.id)}">保留本機並上傳</button></div></article>`).join(''):'<p class="muted">沒有待處理的設定衝突。</p>';}
-async function resolvePlannerConflict(id,choice){const info=plannerConflicts.get(id);if(!info)return;const pending=(await getAll('planner_outbox')).find(x=>x.id===id);if(choice==='local'){
- if(!pending){plannerConflicts.delete(id);renderPlannerSyncState();return;}
- // Re-read the remote revision before declaring an overwrite: RPC will reject a later write.
- const now=await cloudSync.fetchPlannerRows(await cloudSync.accessToken());const latest=now.find(x=>x.item_key===id),expected=latest?.version||0;
- await storeOne('planner_outbox',{...pending,base_version:expected,change_id:guid()});plannerConflicts.delete(id);
+async function resolvePlannerConflict(id,choice){
+ const info=plannerConflicts.get(id);if(!info)return;
+ const pending=(await getAll('planner_outbox')).find(x=>x.id===id),remote=info.remote;
+ if(choice==='local'){
+  if(pending)await storeOne('planner_outbox',{...pending,base_version:Number(remote?.version||0),change_id:guid()});
  }else{
- // A cloud choice discards ONLY the selected local item; all other pending changes remain.
- const db=await idb,remote=info.remote,updated=plannerWithItem(planner,id,remote?.payload,(!remote||remote.deleted));
- await new Promise((resolve,reject)=>{const tx=db.transaction(['meta','planner_outbox'],'readwrite');tx.objectStore('planner_outbox').delete(id);tx.objectStore('meta').put({key:'planner_v14',value:updated});plannerVersions[id]=remote?.version||0;tx.objectStore('meta').put({key:'planner_sync_versions_v15',value:plannerVersions});tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});planner=updated;plannerConflicts.delete(id);
- }renderPlannerSyncState();if(view==='planner')renderPlanner();renderDashboardBudget();toast(choice==='local'?'已排入本機版本，正在嘗試上傳':'已採用雲端版本');cloudSync?.scheduleSync(true);}
+  const updated=plannerWithItem(planner,id,remote?.payload,!remote||remote.deleted);
+  await storeDelete('planner_outbox',id);planner=updated;await setMeta('planner_v14',updated);
+  plannerVersions[id]=Number(remote?.version||0);await setMeta('planner_sync_versions_v15',plannerVersions);
+ }
+ plannerConflicts.delete(id);renderPlannerSyncState();if(view==='planner')renderPlanner();renderDashboardBudget();
+ toast(choice==='local'?'已排入本機版本待重新上傳':'已採用雲端版本');cloudSync?.scheduleSync(true);
+}
 
 /* Cloud sync V1.1. All credentials are entered by the site owner; never ship service_role keys.
    The cloud is opt-in. Browser IndexedDB remains the primary offline cache. */
+/* V1.6 Google Sheets / Apps Script bridge. The GitHub Pages site remains local-first.
+ * Requests pass through a user-supplied, allowlisted Apps Script HTMLService iframe.
+ * This avoids unsupported cross-origin fetch/CORS patterns. No key is bundled.
+ */
 class CloudSync {
- constructor(){this.config=null;this.session=null;this.user=null;this.busy=false;this.state='local';this.message='本機模式 · 尚未設定雲端同步';this.lastSync=null;this.timer=null;}
- async init(){this.config=await getMeta('cloud_config')||null;this.session=await getMeta('cloud_session')||null;this.lastSync=await getMeta('cloud_last_sync')||null;this.user=this.session?.user||null;if(this.config){$('#cloudUrl').value=this.config.url;$('#cloudKey').value=this.config.key;}
-  this.updateMiniStatus();this.renderUI();if(this.session&&this.config&&navigator.onLine){this.sync().catch(e=>this.showError(e));}
-  window.addEventListener('online',()=>this.scheduleSync(true));document.addEventListener('visibilitychange',()=>{if(!document.hidden)this.scheduleSync(true);});
-  this.timer=setInterval(()=>{if(!document.hidden)this.scheduleSync(true);},75000);
+ constructor(){this.config=null;this.key='';this.busy=false;this.state='local';this.message='本機模式 · 尚未連接 Google 試算表';this.lastSync=null;this.frame=null;this.loaded=null;this.waiting=new Map();this.timer=null;this.debounce=null;this.channel=guid();this.entryVersions={};this.catVersion=0;this.entryConflicts=new Map();this.catConflict=null;}
+ async init(){this.config=await getMeta('gsheet_config');this.key=await getMeta('gsheet_key')||'';this.lastSync=await getMeta('gsheet_last_sync');this.entryVersions=await getMeta('gsheet_entry_versions')||{};this.catVersion=Number(await getMeta('gsheet_cat_version')||0);if(this.config){$('#cloudUrl').value=this.config.url;$('#cloudKey').placeholder='已儲存金鑰；如不更換可留空';}this.renderUI();if(this.config&&this.key&&navigator.onLine)this.scheduleSync(true);
+  window.addEventListener('online',()=>this.scheduleSync(true));document.addEventListener('visibilitychange',()=>{if(!document.hidden)this.scheduleSync(true);});this.timer=setInterval(()=>{if(!document.hidden)this.scheduleSync(true);},90000);
+  window.addEventListener('message',e=>{if(!this.frame||e.source!==this.frame.contentWindow)return;const d=e.data;if(!d||d.type!=='daybook-gas-response'||d.channel!==this.channel)return;const w=this.waiting.get(d.id);if(!w)return;this.waiting.delete(d.id);clearTimeout(w.timer);d.ok?w.resolve(d.value):w.reject(Error(d.value?.message||'Apps Script 發生錯誤'));});
  }
  bind(){
-  $('#cloudConfigForm').addEventListener('submit',async e=>{e.preventDefault();try{await this.configure($('#cloudUrl').value.trim(),$('#cloudKey').value.trim());toast('雲端設定已儲存，可以登入帳號。');}catch(err){this.showError(err);}});
-  $('#cloudAuthForm').addEventListener('submit',async e=>{e.preventDefault();await this.login(false);});
-  $('#cloudSignup').onclick=()=>this.login(true);
-  $('#cloudLogout').onclick=()=>this.logout();
+  $('#cloudConfigForm').addEventListener('submit',async e=>{e.preventDefault();try{await this.configure($('#cloudUrl').value.trim(),$('#cloudKey').value.trim());toast('Google 試算表同步設定已保存');await this.sync();}catch(err){this.showError(err);}});
   $('#cloudSyncNow').onclick=()=>this.sync().catch(err=>this.showError(err));
+  $('#cloudLogout').onclick=async()=>{if(!confirm('停用此裝置的 Google 試算表同步？本機帳目仍保留。'))return;this.config=null;this.key='';this.frame?.remove();this.frame=null;this.loaded=null;for(const w of this.waiting.values()){clearTimeout(w.timer);w.reject(Error('已取消連線'));}this.waiting.clear();await setMeta('gsheet_config',null);await setMeta('gsheet_key',null);this.state='local';this.message='已停用此裝置同步 · 本機記帳仍可使用';this.renderUI();};
+  const box=$('#entryConflictList');box?.addEventListener('click',e=>{const b=e.target.closest('[data-entry-choice]');if(b)this.resolveConflict(b.dataset.entryId,b.dataset.entryChoice).catch(err=>this.showError(err));});
  }
- async configure(url,key){url=url.replace(/\/+$/,'');if(!/^https:\/\/[a-z0-9.-]+\.[a-z]{2,}$/i.test(url)&&!/^http:\/\/localhost(?::\d+)?$/i.test(url))throw Error('請填入有效的 HTTPS Supabase 專案 URL');if(key.length<15)throw Error('公開金鑰格式不正確');if(key.startsWith('sb_secret_'))throw Error('不可使用 secret 金鑰！請改用 publishable / anon 公開金鑰');if(key.includes('.')){try{const body=JSON.parse(atob(key.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));if(body.role==='service_role')throw Error('不可使用 service_role 金鑰！');}catch(err){if(String(err.message).includes('service_role'))throw err;}}
-  if(this.config&&(this.config.url!==url||this.config.key!==key)&&this.session)throw Error('請先登出舊雲端帳號，才能更換專案設定');this.config={url,key};await setMeta('cloud_config',this.config);this.state='configured';this.message='雲端設定已儲存 · 請登入';this.renderUI();}
- async request(method,path,body,token,extraHeaders={}){if(!this.config)throw Error('尚未設定雲端 URL 和公開金鑰');if(!navigator.onLine)throw Error('目前離線，已保存在裝置中，恢復網路後再同步');const headers={'apikey':this.config.key,'Content-Type':'application/json',...extraHeaders};if(token)headers.Authorization='Bearer '+token;
-  const response=await fetch(this.config.url+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});let data;const raw=await response.text();try{data=raw?JSON.parse(raw):null;}catch{data=raw;}if(!response.ok){const detail=typeof data==='object'?data?.msg||data?.message||data?.error_description||data?.hint||data?.details||data?.error:raw;throw Error(`雲端服務 ${response.status}：${detail||'請確認雲端資料表、權限與網路'}`);}return data;
+ validUrl(url){url=url.replace(/\/+$/,'');if(!/^https:\/\/script\.google\.com\/macros\/s\/[a-z0-9_-]+\/exec$/i.test(url))throw Error('請填寫你自己部署的 Apps Script Web App /exec 網址');return url;}
+ async configure(url,key){url=this.validUrl(url);if(!key)key=this.key;if(!/^[a-f0-9]{64}$/i.test(key))throw Error('請貼上 setupDaybook 產生的 64 碼同步金鑰');if(this.config&&this.config.url!==url&&!confirm('你正在更換雲端試算表。建議先下載 JSON 備份。要繼續嗎？'))return;
+  const newId='gapps:'+url.split('/').slice(-2)[0];
+  if(linkedUserId!==newId){const old=linkedUserId;linkedUserId=newId;await setMeta('linked_user',newId);this.entryVersions={};this.catVersion=0;plannerVersions={};await setMeta('gsheet_entry_versions',{});await setMeta('gsheet_cat_version',0);await setMeta('planner_sync_versions_v15',{});await setMeta('gsheet_bootstrap_'+newId,false);await setMeta('cloud_categories_dirty',Boolean(records.length||plannerItems(planner).size));
+    // Existing records are queued on FIRST connection, so none are silently discarded.
+    for(const r of records)await storeOne('outbox',{id:r.id,deleted:false,payload:r,change_id:guid()});
+    for(const [id,payload] of plannerItems(planner))await storeOne('planner_outbox',{id,deleted:false,payload,base_version:0,change_id:guid()});
+    if(old&&old!==newId)toast('已切換同步服務，請先檢查是否有舊版未同步資料');
+  }
+  this.config={url};this.key=key;await setMeta('gsheet_config',this.config);await setMeta('gsheet_key',key);$('#cloudKey').value='';this.frame?.remove();this.frame=null;this.loaded=null;this.state='configured';this.message='已設定 Google Apps Script · 正在測試連線';this.renderUI();
  }
- async login(signup){if(!this.config){this.showError(Error('請先完成步驟 1：設定 Supabase 專案'));return;}const email=$('#cloudEmail').value.trim(),password=$('#cloudPassword').value;
-  if(!email||password.length<6){this.showError(Error('請輸入 Email 與至少 6 位數的密碼'));return;}
-  this.state='busy';this.message=signup?'正在註冊帳號…':'正在確認登入…';this.renderUI();
-  try{const result=signup?await this.request('POST','/auth/v1/signup',{email,password}):await this.request('POST','/auth/v1/token?grant_type=password',{email,password});
-   if(!result?.access_token){this.state='configured';this.message='註冊已送出 · 若有驗證信請先完成 Email 驗證，再按登入';this.renderUI();toast(this.message);return;}
-   if(linkedUserId&&linkedUserId!==result.user?.id){this.session=null;this.user=null;this.state='error';this.message='安全保護：此裝置已綁定另一個雲端帳號。若要切換，請先下載 JSON 備份，再透過瀏覽器設定清除此網站的所有網站資料。';this.renderUI();return;}
-   this.session=this.sessionFromAuth(result);this.user=this.session.user;await setMeta('cloud_session',this.session);$('#cloudPassword').value='';this.message='登入成功 · 正在合併帳本';this.state='busy';this.renderUI();await this.sync();
-  }catch(err){this.showError(err);}
+ async bridgeRequest(action,extra={}){
+  if(!navigator.onLine)throw Error('目前離線，帳目已儲存在本機，恢復連線後再同步');
+  if(!this.config||!this.key)throw Error('請先設定 Apps Script 網址和同步金鑰');
+  if(!this.frame){const frame=document.createElement('iframe');frame.title='拾光記帳雲端同步橋接';frame.setAttribute('aria-hidden','true');frame.style.cssText='position:fixed;left:-100px;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none';frame.src=this.config.url;document.body.appendChild(frame);this.frame=frame;this.loaded=new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Apps Script 橋接載入逾時，請檢查部署權限與網址')),30000);frame.onload=()=>{clearTimeout(timer);resolve();};frame.onerror=()=>{clearTimeout(timer);reject(Error('Apps Script 橋接無法開啟'));};});}
+  await this.loaded;
+  const id=guid(),request={action,key:this.key,...extra};
+  return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{this.waiting.delete(id);reject(Error('Apps Script 45 秒內未回應，請檢查部署版本、權限或網路'));},45000);this.waiting.set(id,{resolve,reject,timer});this.frame.contentWindow.postMessage({type:'daybook-gas-request',id,channel:this.channel,request},'*');});
  }
- sessionFromAuth(auth){return {access_token:auth.access_token,refresh_token:auth.refresh_token,expires_at:Date.now()+((auth.expires_in||3600)-90)*1000,user:auth.user};}
- async accessToken(){if(!this.session)throw Error('尚未登入');if(Date.now()<this.session.expires_at)return this.session.access_token;
-  const next=await this.request('POST','/auth/v1/token?grant_type=refresh_token',{refresh_token:this.session.refresh_token});this.session=this.sessionFromAuth(next);this.user=this.session.user;await setMeta('cloud_session',this.session);return this.session.access_token;}
- async logout(){if(!this.session)return;try{const tok=await this.accessToken();await this.request('POST','/auth/v1/logout',{},tok);}catch(e){console.warn('remote logout',e);}this.session=null;this.user=null;await setMeta('cloud_session',null);this.state='local';this.message='已登出雲端 · 本機帳目繼續保留';this.renderUI();toast('已登出雲端；本機帳本仍可離線使用');}
- updateMiniStatus(){const mini=$('#syncMiniStatus');if(!mini)return;mini.textContent=this.busy?'☁ 正在同步…':this.session?(this.state==='error'?'⚠ 同步異常 · 本機仍可使用':`☁ ${this.lastSync?'已同步':'已登入 · 待同步'}`):linkedUserId?'☁ 已登出 · 本機模式':'☁ 本機模式 · 可選雲端同步';}
- renderUI(){const el=$('#cloudState');if(!el)return;const ready=Boolean(this.session);el.className='cloud-state '+(this.state==='error'?'error':this.busy?'busy':ready?'ready':'');el.textContent=this.message+(this.lastSync&&ready?` ｜ 最近成功：${new Date(this.lastSync).toLocaleString('zh-TW')}`:'');$('#cloudAccountInfo').textContent=ready?`已登入：${this.user?.email||'已驗證帳號'} · ${records.length} 筆本機交易`:(linkedUserId?'已登出：可離線記帳，重新登入同帳號即可同步':'尚未登入 · 記帳不會自動上傳');$('#cloudSyncNow').disabled=!ready||this.busy;$('#cloudLogout').disabled=!ready||this.busy;$('#cloudConfigForm').querySelector('button[type="submit"]').disabled=this.busy;$('#cloudLogin').disabled=this.busy;$('#cloudSignup').disabled=this.busy;this.updateMiniStatus();}
- showError(e){console.warn('Daybook Cloud',e);this.busy=false;this.state='error';this.message=String(e.message||e).slice(0,220);this.renderUI();toast('雲端同步：'+this.message);}
- scheduleSync(immediate=false){if(!this.session||!this.config||this.busy||!navigator.onLine)return;clearTimeout(this.debounce);this.debounce=setTimeout(()=>{this.sync().catch(e=>this.showError(e));},immediate?100:1600);}
- async fetchCloudEntries(token){let all=[],offset=0;const limit=750;for(let page=0;page<150;page++){const rows=await this.request('GET',`/rest/v1/daybook_entries?select=entry_id,payload,deleted&order=entry_id.asc&limit=${limit}&offset=${offset}`,undefined,token);if(!Array.isArray(rows))throw Error('無法取得雲端明細，請確認 SQL 資料表已建立');all.push(...rows);if(rows.length<limit)return all;offset+=rows.length;}throw Error('雲端帳目數量超出單次同步上限，請聯繫開發者');}
- async sendEntries(token,list){const size=160;for(let i=0;i<list.length;i+=size){const rows=list.slice(i,i+size).map(e=>({user_id:this.user.id,entry_id:e.id,payload:e.deleted?null:e.payload,deleted:Boolean(e.deleted)}));await this.request('POST','/rest/v1/daybook_entries?on_conflict=user_id,entry_id',rows,token,{'Prefer':'resolution=merge-duplicates,return=minimal'});}}
- async getCloudCategories(token){const v=await this.request('GET','/rest/v1/daybook_preferences?select=categories&limit=1',undefined,token);return Array.isArray(v)&&v[0]?.categories&&typeof v[0].categories==='object'?v[0].categories:null;}
- async sendCategories(token,choice){await this.request('POST','/rest/v1/daybook_preferences?on_conflict=user_id',[{user_id:this.user.id,categories:choice}],token,{'Prefer':'resolution=merge-duplicates,return=minimal'});}
- async fetchPlannerRows(tok){let result=[],offset=0;for(let i=0;i<50;i++){const rows=await this.request('GET',`/rest/v1/daybook_planner_items?select=item_key,payload,deleted,version&order=item_key.asc&limit=750&offset=${offset}`,undefined,tok);if(!Array.isArray(rows))throw Error('無法讀取預算及固定收支同步表');result.push(...rows);if(rows.length<750)return result;offset+=rows.length;}throw Error('雲端設定資料超出查詢上限');}
- async commitPlannerItem(tok,item){const result=await this.request('POST','/rest/v1/rpc/daybook_save_planner_item',{p_item_key:item.id,p_payload:item.deleted?null:item.payload,p_deleted:Boolean(item.deleted),p_expected_version:Number(item.base_version||0)},tok);const revision=Number(result);if(!Number.isInteger(revision))throw Error('雲端沒有回傳設定版本號，請重新執行 V1.5 SQL');return revision;}
- async syncPlanner(tok){const remote=await this.fetchPlannerRows(tok),remoteMap=new Map(remote.map(x=>[x.item_key,x]));let pending=await getAll('planner_outbox');const pendingMap=new Map(pending.map(x=>[x.id,x]));const localMap=plannerItems(planner);
- // Bootstrap V1.4 data on first V1.5 cloud use. Missing remote -> upload; differing remote -> explicit conflict.
- for(const [id,payload] of localMap){if(pendingMap.has(id))continue;const cloud=remoteMap.get(id);if(!cloud){const change={id,payload,deleted:false,base_version:0,change_id:guid()};await storeOne('planner_outbox',change);pendingMap.set(id,change);}else if(cloud.deleted||!plannerEqual(payload,cloud.payload)){
- if((plannerVersions[id]||0)===0){const change={id,payload,deleted:false,base_version:0,change_id:guid()};await storeOne('planner_outbox',change);pendingMap.set(id,change);} }
- else plannerVersions[id]=cloud.version;
+ async ping(){return this.bridgeRequest('ping');}
+ async pull(){const r=await this.bridgeRequest('pull');if(!r?.ok||!Array.isArray(r.records)||!Array.isArray(r.planner)||!Array.isArray(r.meta))throw Error('試算表同步回傳格式不正確');return r;}
+ async push(changes){if(!changes.length)return [];const out=[];for(let i=0;i<changes.length;i+=65){this.message=`正在上傳到 Google 試算表 ${Math.min(i+65,changes.length)} / ${changes.length} 筆…`;this.renderUI();const r=await this.bridgeRequest('push',{changes:changes.slice(i,i+65)});if(!r?.ok||!Array.isArray(r.results))throw Error('寫入試算表失敗，沒有收到確認');out.push(...r.results);}return out;}
+ scheduleSync(immediate=false){if(!this.config||!this.key||this.busy||!navigator.onLine)return;clearTimeout(this.debounce);this.debounce=setTimeout(()=>this.sync().catch(e=>this.showError(e)),immediate?200:2000);}
+ showError(err){console.warn('Daybook Google Sheets sync',err);this.busy=false;this.state='error';this.message='同步失敗：'+String(err.message||err).slice(0,180)+'（本機資料仍保留）';this.renderUI();toast(this.message);}
+ updateMiniStatus(){const el=$('#syncMiniStatus');if(!el)return;el.textContent=this.busy?'☁ Google 試算表同步中…':this.config?(this.state==='error'?'⚠ 試算表同步異常 · 本機安全':this.lastSync?'☁ Google 試算表已同步':'☁ Google 試算表待同步'):'☁ 本機模式';}
+ renderUI(){const ready=Boolean(this.config&&this.key);const el=$('#cloudState');if(!el)return;el.className='cloud-state '+(this.state==='error'?'error':this.busy?'busy':ready?'ready':'');el.textContent=this.message+(this.lastSync&&ready?' ｜ 最近成功：'+new Date(this.lastSync).toLocaleString('zh-TW'):'');$('#cloudAccountInfo').textContent=ready?'Google 試算表已設定 · '+records.length+' 筆本機記帳 · 離線可繼續使用':'未連接雲端 · 記帳只儲存在這個裝置';$('#cloudSyncNow').disabled=!ready||this.busy;$('#cloudLogout').disabled=!ready||this.busy;$('#cloudConfigForm').querySelector('button[type="submit"]').disabled=this.busy;this.updateMiniStatus();this.renderConflicts();}
+ renderConflicts(){const el=$('#entryConflictList');if(!el)return;let rows=[...this.entryConflicts.values()].map(c=>({id:c.id,name:c.local?.note||c.local?.category||'記帳 '+c.id.slice(0,8)}));if(this.catConflict)rows.push({id:'meta:categories',name:'分類管理設定'});el.innerHTML=rows.length?'<h3>需要確認的記帳／分類衝突</h3>'+rows.map(c=>`<div class="sync-conflict-row"><b>${esc(c.name)}</b><div class="setting-actions"><button type="button" class="button button-outline" data-entry-id="${esc(c.id)}" data-entry-choice="cloud">使用雲端</button><button type="button" class="button button-primary" data-entry-id="${esc(c.id)}" data-entry-choice="local">保留本機並上傳</button></div></div>`).join(''):'<p class="muted">目前沒有待處理的交易／分類衝突。</p>';}
+ async resolveConflict(id,choice){if(id==='meta:categories'){
+   const info=this.catConflict;if(!info)return;
+   if(choice==='cloud'){cats={...DEF_CATS,...(info.remote?.payload||{})};await storeOne('meta',{key:'categories',value:cats});await setMeta('cloud_categories_dirty',false);refreshCatSelectors();}
+   else {this.catVersion=Number(info.remote?.version||0);await setMeta('gsheet_cat_version',this.catVersion);}
+   this.catConflict=null;
+  } else {
+   const info=this.entryConflicts.get(id);if(!info)return;
+   if(choice==='cloud'){await storeDelete('outbox',id);const data=info.remote;if(data&&!data.deleted&&data.payload){const r=validateRecord(data.payload);if(r)await storeOne('records',r);}else await storeDelete('records',id);records=await getAll('records');}
+   else {const o=(await getAll('outbox')).find(x=>x.id===id);if(o)await storeOne('outbox',{...o,change_id:guid()});this.entryVersions[id]=Number(info.remote?.version||0);await setMeta('gsheet_entry_versions',this.entryVersions);}
+   this.entryConflicts.delete(id);
+  }
+  render();this.renderConflicts();toast(choice==='cloud'?'已採用雲端設定':'本機版本已準備重新上傳');this.scheduleSync(true);
  }
- pending=await getAll('planner_outbox');const activePending=new Map(pending.map(x=>[x.id,x]));
- // Download non-dirty items; never replace an offline local edit.
- let merged=planner;
- for(const [id,cloud] of remoteMap){if(activePending.has(id))continue;if((plannerVersions[id]||0)===cloud.version&&localMap.has(id))continue;
- merged=plannerWithItem(merged,id,cloud.payload,cloud.deleted);plannerVersions[id]=cloud.version;
- }
- if(!plannerEqual(planner,merged)){planner=merged;await setMeta('planner_v14',planner);}
- await setMeta('planner_sync_versions_v15',plannerVersions);
- for(const item of pending){const current=remoteMap.get(item.id),currentVersion=Number(current?.version||0);
-   if(currentVersion!==Number(item.base_version||0)){
-    // Device may have inherited V1.4 data without a base version; identical remote content is safe.
-    if(current&&current.deleted===Boolean(item.deleted)&&plannerEqual(current.payload,item.deleted?null:item.payload)){
-     plannerVersions[item.id]=currentVersion;await clearPlannerQueueIfMatch(item);plannerConflicts.delete(item.id);continue;
+ async sync(){if(!this.config||!this.key||this.busy)return;this.busy=true;this.state='busy';this.message='正在與 Google 試算表核對資料…';this.renderUI();try{
+   await this.ping();let snap=await this.pull();const recMap=new Map(snap.records.map(x=>[x.id,x])),planMap=new Map(snap.planner.map(x=>[x.id,x])),catRow=snap.meta.find(x=>x.id==='categories');
+   // Newly linked browsers and older versions: bootstrap local unmatched records.
+   const pending=new Map((await getAll('outbox')).map(x=>[x.id,x]));
+   for(const r of records){if(pending.has(r.id))continue;const remote=recMap.get(r.id);if(!remote){const c={id:r.id,payload:r,deleted:false,change_id:guid()};await storeOne('outbox',c);pending.set(r.id,c);}else if(!plannerEqual(r,remote.payload)||remote.deleted){if(!Object.prototype.hasOwnProperty.call(this.entryVersions,r.id)){const c={id:r.id,payload:r,deleted:false,change_id:guid()};await storeOne('outbox',c);pending.set(r.id,c);}}}
+   const plans=plannerItems(planner),planPending=new Map((await getAll('planner_outbox')).map(x=>[x.id,x]));
+   for(const [id,payload] of plans){if(planPending.has(id))continue;const remote=planMap.get(id);if(!remote){const p={id,payload,deleted:false,base_version:0,change_id:guid()};await storeOne('planner_outbox',p);planPending.set(id,p);}else if(!plannerEqual(payload,remote.payload)&&!Object.prototype.hasOwnProperty.call(plannerVersions,id)){const p={id,payload,deleted:false,base_version:0,change_id:guid()};await storeOne('planner_outbox',p);planPending.set(id,p);}}
+   const changes=[];
+   for(const p of pending.values())if(!this.entryConflicts.has(p.id))changes.push({kind:'records',id:p.id,payload:p.payload,deleted:p.deleted,baseVersion:Number(this.entryVersions[p.id]||0),change_id:p.change_id});
+   for(const p of planPending.values())if(!plannerConflicts.has(p.id))changes.push({kind:'planner',id:p.id,payload:p.payload,deleted:p.deleted,baseVersion:Number(p.base_version||0),change_id:p.change_id});
+   const catDirty=Boolean(await getMeta('cloud_categories_dirty'));
+   if(catDirty&&!this.catConflict)changes.push({kind:'meta',id:'categories',payload:cats,deleted:false,baseVersion:this.catVersion});
+   const answers=await this.push(changes);
+   for(const a of answers){const source=changes.find(c=>c.kind===a.kind&&c.id===a.id);if(!source)continue;
+    if(a.kind==='records'){
+      if(a.status==='ok'){this.entryVersions[a.id]=a.version;await clearOutboxIfUnchanged([{id:a.id,change_id:source.change_id}]);this.entryConflicts.delete(a.id);}
+      else this.entryConflicts.set(a.id,{id:a.id,remote:a.remote,local:source.payload});
+    }else if(a.kind==='planner'){
+      if(a.status==='ok'){plannerVersions[a.id]=a.version;await clearPlannerQueueIfMatch(source);plannerConflicts.delete(a.id);}
+      else plannerConflicts.set(a.id,{id:a.id,remote:a.remote});
+    }else if(a.kind==='meta'){
+      if(a.status==='ok'){this.catVersion=a.version;await setMeta('cloud_categories_dirty',false);this.catConflict=null;}
+      else this.catConflict={remote:a.remote};
     }
-    plannerConflicts.set(item.id,{id:item.id,remote:current||null});continue;
    }
-   const nextVersion=await this.commitPlannerItem(tok,item);
-   if(nextVersion<0){const currentRows=await this.fetchPlannerRows(tok);plannerConflicts.set(item.id,{id:item.id,remote:currentRows.find(x=>x.item_key===item.id)||null});continue;}
-   plannerVersions[item.id]=nextVersion;await clearPlannerQueueIfMatch(item);const newer=(await getAll('planner_outbox')).find(x=>x.id===item.id);if(newer&&newer.base_version===item.base_version){await storeOne('planner_outbox',{...newer,base_version:nextVersion});}plannerConflicts.delete(item.id);
- }
- await setMeta('planner_sync_versions_v15',plannerVersions);renderPlannerSyncState();if(view==='planner')renderPlanner();renderDashboardBudget();return {pending:(await getAll('planner_outbox')).length,conflicts:plannerConflicts.size};
- }
- async sync(){if(!this.session||!this.config||this.busy)return;if(linkedUserId&&linkedUserId!==this.user?.id)throw Error('本機資料已綁定不同雲端帳號，禁止混合');this.busy=true;this.state='busy';this.message='安全同步中 · 正在讀取雲端記錄…';this.renderUI();let beforeCount=records.length;
-  try{const tok=await this.accessToken();let remote=await this.fetchCloudEntries(tok);const remoteIds=new Set(remote.map(x=>x.entry_id));const initial=!linkedUserId;
-   if(initial){const unseen=records.filter(x=>!remoteIds.has(x.id));if(unseen.length){this.message=`首次整合：上傳本機 ${unseen.length} 筆新記帳…`;this.renderUI();await this.sendEntries(tok,unseen.map(e=>({id:e.id,payload:e,deleted:false})));}}
-   else {const changes=await getAll('outbox');if(changes.length){this.message=`上傳 ${changes.length} 筆離線／更新的交易…`;this.renderUI();await this.sendEntries(tok,changes);await clearOutboxIfUnchanged(changes);}}
-   let remoteCats=await this.getCloudCategories(tok);const categoryChanged=Boolean(await getMeta('cloud_categories_dirty'));
-   if(initial){if(!remoteCats){await this.sendCategories(tok,cats);remoteCats=cats;}else{const combined={...cats,...remoteCats};if(Object.keys(combined).length>Object.keys(remoteCats).length){await this.sendCategories(tok,combined);remoteCats=combined;}}}
-   else if(categoryChanged){await this.sendCategories(tok,cats);await setMeta('cloud_categories_dirty',false);remoteCats=cats;}
-   if(!linkedUserId){linkedUserId=this.user.id;await setMeta('linked_user',linkedUserId);await setMeta('cloud_categories_dirty',false);}
-   remote=await this.fetchCloudEntries(tok);
-   if(remoteCats){const sanitized={...DEF_CATS};for(const [name,def] of Object.entries(remoteCats)){if(typeof name!=='string'||name.length>25||!def||typeof def!=='object')continue;sanitized[name]={emoji:String(def.emoji||'📌').slice(0,8),color:/^#[\da-f]{6}$/i.test(def.color)?def.color:'#837ddf',bg:/^#[\da-f]{6}$/i.test(def.bg)?def.bg:'#f0efff'};}cats=sanitized;await storeOne('meta',{key:'categories',value:cats});}
-   await loadRemoteSnapshot(remote);const pending=await getAll('outbox');if(!beforeCount&&records.length){analyticsFrom=Math.min(...records.map(x=>Number(x.date.slice(0,4))));analyticsTo=Math.max(...records.map(x=>Number(x.date.slice(0,4))));yearsApplyInit();render();}
-   const planResult=await this.syncPlanner(tok);this.lastSync=new Date().toISOString();await setMeta('cloud_last_sync',this.lastSync);this.state=planResult.conflicts?'error':'ready';this.message=`交易已同步 · 本機 ${records.length} 筆 · 交易待同步 ${pending.length} 筆 · 設定待同步 ${planResult.pending} 項${planResult.conflicts?' · 有 '+planResult.conflicts+' 項衝突待選擇':''}`;this.busy=false;this.renderUI();if(pending.length||(await getAll('planner_outbox')).length&&!plannerConflicts.size)this.scheduleSync();
-  }catch(err){this.busy=false;this.state='error';this.message='同步失敗：'+String(err.message||err).slice(0,190)+' · 本機資料未刪除';this.renderUI();throw err;}
+   await setMeta('gsheet_entry_versions',this.entryVersions);await setMeta('planner_sync_versions_v15',plannerVersions);await setMeta('gsheet_cat_version',this.catVersion);
+   // Re-pull after successful writes and overlay pending local changes before replacing IndexedDB.
+   snap=await this.pull();const newCat=snap.meta.find(x=>x.id==='categories');
+   if(newCat&&!await getMeta('cloud_categories_dirty')&&!this.catConflict){this.catVersion=newCat.version;cats={...DEF_CATS,...(newCat.payload||{})};await storeOne('meta',{key:'categories',value:cats});await setMeta('gsheet_cat_version',this.catVersion);}
+   const remain=await getAll('outbox');const dirtyRecIds=new Set(remain.map(x=>x.id));
+   for(const row of snap.records)if(!dirtyRecIds.has(row.id))this.entryVersions[row.id]=row.version;
+   await setMeta('gsheet_entry_versions',this.entryVersions);
+   const remoteForView=snap.records.map(x=>({entry_id:x.id,payload:x.payload,deleted:x.deleted}));await loadRemoteSnapshot(remoteForView);
+   const dirtyPlans=new Map((await getAll('planner_outbox')).map(x=>[x.id,x]));let merged=planner;
+   for(const row of snap.planner){if(dirtyPlans.has(row.id))continue;merged=plannerWithItem(merged,row.id,row.payload,row.deleted);plannerVersions[row.id]=row.version;}
+   if(!plannerEqual(merged,planner)){planner=sanitizePlanner(merged);await setMeta('planner_v14',planner);}
+   await setMeta('planner_sync_versions_v15',plannerVersions);
+   if(view==='planner')renderPlanner();renderDashboardBudget();renderPlannerSyncState();
+   this.lastSync=new Date().toISOString();await setMeta('gsheet_last_sync',this.lastSync);this.state=this.entryConflicts.size||plannerConflicts.size||this.catConflict?'error':'ready';this.message=`同步完成 · 交易 ${records.length} 筆 · 待傳 ${remain.length} 筆 · 設定待傳 ${(await getAll('planner_outbox')).length} 項`+(this.state==='error'?' · 有版本衝突待確認':'');this.busy=false;this.renderUI();
+  }catch(err){this.showError(err);throw err;}
  }
 }
 

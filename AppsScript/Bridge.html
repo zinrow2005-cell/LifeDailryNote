@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><base target="_top"></head><body>
+<script>
+(function () {
+  'use strict';
+  // Allow only the explicit owner's site. A public iframe does not grant Sheet access.
+  const ALLOWED_ORIGIN = <?!= JSON.stringify(allowedOrigin) ?>;
+  window.addEventListener('message', function (event) {
+    if (event.source !== window.parent || event.origin !== ALLOWED_ORIGIN) return;
+    const m = event.data;
+    if (!m || m.type !== 'daybook-gas-request' || !/^[a-z0-9-]{12,120}$/i.test(m.id || '')) return;
+    const answer = function(ok, value) {
+      event.source.postMessage({type:'daybook-gas-response', id:m.id, channel:m.channel, ok:ok, value:value}, event.origin);
+    };
+    google.script.run.withSuccessHandler(v=>answer(true,v))
+      .withFailureHandler(e=>answer(false,{message:String(e && e.message || e)}))
+      .daybookApi(m.request);
+  });
+}());
+</script>
+</body></html>
