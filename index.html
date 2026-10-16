@@ -4,14 +4,14 @@
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icons/icon-192.png"><meta name="theme-color" content="#14213c"><meta name="description" content="一個兼具快速記帳、分類、搜尋與跨年度統計的私人財務手帳。">
   <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="拾光記帳">
-  <title>拾光記帳 · Daybook V1.9.0</title>
+  <title>拾光記帳 · Daybook V1.9.1</title>
   
-  <link rel="stylesheet" href="./styles.css?v=1.9.0">
+  <link rel="stylesheet" href="./styles.css?v=1.9.1">
 </head>
 <body>
 <div class="app-shell">
   <aside class="sidebar" id="sidebar">
-    <div class="brand"><div class="brand-icon">✦</div><div><div class="brand-name">拾光記帳<span> / Daybook</span></div><div class="brand-sub">Your little money journal · <strong>V1.9.0 · 一體式雲端記帳</strong></div></div></div>
+    <div class="brand"><div class="brand-icon">✦</div><div><div class="brand-name">拾光記帳<span> / Daybook</span></div><div class="brand-sub">Your little money journal · <strong>V1.9.1 · 一體式雲端記帳</strong></div></div></div>
     <div class="nav-label">MAIN MENU</div>
     <nav class="side-nav" aria-label="主要導覽">
       <button class="nav-item active" data-view="dashboard"><span class="nav-ico">▦</span><span>總覽儀表板</span></button>
@@ -55,13 +55,13 @@
 </section>
       <section class="page" id="page-categories"><div class="page-head"><div><p class="eyebrow">MAKE IT YOURS</p><h1>分類整齊，<em>生活有序。</em></h1><p class="page-desc">保留 Excel 原有分類，也能自行新增、改名。</p></div><button class="button button-primary" id="addCategoryBtn">＋ 新增分類</button></div><div class="category-mosaic" id="categoryCards"></div><p class="muted category-help">重新命名分類會同步套用到既有記錄；已有記錄的分類不提供直接刪除，避免遺失統計歸屬。</p></section>
       <section class="page" id="page-settings"><div class="page-head"><div><p class="eyebrow">YOUR DATA, YOUR CONTROL</p><h1>安心保存，<em>記錄不遺失。</em></h1><p class="page-desc">儲存在目前裝置上，可自行匯出備份與帶到其他裝置。</p></div></div><section class="panel cloud-panel" id="cloudPanel">
- <div class="cloud-head"><div class="cloud-emblem">☁</div><div><p class="section-kicker">GOOGLE SHEETS SYNC</p><h2>Google 試算表跨裝置同步 <span class="ver-pill">V1.9.0 · 同頁同步</span></h2><p class="muted">在目前這個 GitHub 記帳畫面直接同步 Google Sheets；不用另外開啟第二套系統。離線先記帳，恢復連線後再同步。</p></div></div>
- <div class="note-banner" id="syncTransportInfo" role="status"><strong>目前版本：V1.9.0</strong> ｜ 同步方式：GitHub 單頁直接讀寫 Google Sheets（無第二個記帳介面），寫入後會重新查詢確認。</div><div id="cloudState" class="cloud-state" role="status">本機模式 · 未連線</div>
+ <div class="cloud-head"><div class="cloud-emblem">☁</div><div><p class="section-kicker">GOOGLE SHEETS SYNC</p><h2>Google 試算表跨裝置同步 <span class="ver-pill">V1.9.1 · 同頁同步</span></h2><p class="muted">在目前這個 GitHub 記帳畫面直接同步 Google Sheets；不用另外開啟第二套系統。離線先記帳，恢復連線後再同步。</p></div></div>
+ <div class="note-banner" id="syncTransportInfo" role="status"><strong>目前版本：V1.9.1</strong> ｜ 同步方式：GitHub 單頁直接讀寫 Google Sheets（無第二個記帳介面），寫入後會重新查詢確認。</div><div id="cloudState" class="cloud-state" role="status">本機模式 · 未連線</div>
  <div class="planner-sync-box"><div class="planner-sync-head"><strong>預算與固定收支同步</strong><span id="plannerSyncStatus" role="status">讀取設定…</span></div><div id="plannerConflictList" class="planner-conflict-list"></div><p class="muted">同一筆設定在兩台裝置同時變更時，不會直接覆蓋。請選擇要保留哪一個版本。</p></div>
  <div class="planner-sync-box"><div id="entryConflictList" class="planner-conflict-list"><p class="muted">目前沒有待處理的交易／分類衝突。</p></div></div>
  <div class="cloud-grid">
  <form id="cloudConfigForm" class="cloud-step"><h3><span class="cloud-step-num">1</span> 啟用 Google Sheet 同步</h3><p>首次設定請填入 Apps Script /exec 網址與私人同步金鑰（只需設定一次），之後新增、編輯、年度統計都直接在此操作。先按「只測試 Google 連線」，確認後再開始同步。</p>
- <label>Google Apps Script /exec 網址<input id="cloudUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec" value="https://script.google.com/macros/s/AKfycbzQp3k0KMAUhfIAQdK59TPzjH0SbMRsnsoHX9fq-p23DRV8zlP1oKGB0EtfaoOjKLpZ/exec" autocomplete="off" spellcheck="false" required></label>
+ <label>Google Apps Script /exec 網址 <small>（已內建，不必再貼上）</small><input id="cloudUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec" value="https://script.google.com/macros/s/AKfycbzQp3k0KMAUhfIAQdK59TPzjH0SbMRsnsoHX9fq-p23DRV8zlP1oKGB0EtfaoOjKLpZ/exec" autocomplete="off" spellcheck="false" required><small class="cloud-url-help">✓ 已自動帶入你的 Google Apps Script 部署網址；只有日後更換部署時才需要修改。</small></label>
  <label>私人同步金鑰<input id="cloudKey" type="password" placeholder="輸入 setupDaybook 產生的 64 碼金鑰" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off"></label>
  <div id="cloudKeyHint" class="cloud-key-hint" role="status">請貼上完整 64 碼同步金鑰；不更換可留空。</div>
  <div class="setting-actions"><button class="button button-outline" id="cloudDiagnose" type="button">只測試 Google 連線（不傳帳目）</button><button class="button button-primary" type="submit">儲存設定並開始同步</button></div>
@@ -95,6 +95,6 @@
 </div>
 <div class="modal-layer" id="recurringModal" aria-hidden="true"><div class="modal-backdrop" data-close="recurringModal"></div><div class="modal-sheet compact-modal" role="dialog" aria-modal="true" aria-labelledby="recurringTitle"><div class="modal-top"><div><p class="section-kicker">RECURRING TEMPLATE</p><h2 id="recurringTitle">新增固定收支</h2></div><button class="close-modal" data-close="recurringModal" aria-label="關閉">×</button></div><form id="recurringForm"><input id="recurringId" type="hidden"><div class="form-grid"><label>收支類型<select id="recurringType"><option value="expense">支出</option><option value="income">收入</option></select></label><label>重複週期<select id="recurringInterval"><option value="1">每月</option><option value="2">每兩個月</option><option value="3">每季</option><option value="12">每年</option></select></label><label class="span-2">項目名稱<input id="recurringName" maxlength="80" placeholder="例如：住家電費" required></label><label>預計金額（NT$）<input id="recurringAmount" type="number" min="0.01" step="0.01" inputmode="decimal" required></label><label>分類<select id="recurringCategory" required></select></label><label class="span-2">首次日期<input id="recurringStart" type="date" required></label><label class="span-2">備註<input id="recurringMemo" maxlength="200" placeholder="例如：每兩個月繳一次，可入帳時修正金額"></label></div><div class="modal-actions"><button type="button" class="button button-outline" data-close="recurringModal">取消</button><button class="button button-primary" type="submit">儲存固定收支 ✓</button></div></form></div></div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div><input id="jsonFileInput" type="file" accept=".json,application/json" hidden><input id="csvFileInput" type="file" accept=".csv,text/csv" hidden>
-<script src="./app.js?v=1.9.0" defer></script>
+<script src="./app.js?v=1.9.1" defer></script>
 </body>
 </html>

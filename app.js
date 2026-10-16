@@ -1,4 +1,4 @@
-/* 拾光記帳 v1.9.0 — local-first, zero runtime dependencies. No personal data is bundled. */
+/* 拾光記帳 v1.9.1 — local-first, zero runtime dependencies. No personal data is bundled. */
 (()=>{'use strict';
 const DAYBOOK_SYNC_MODE = 'jsonp-get/post-verify'; // one GitHub UI, Google Sheets behind the scenes
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
@@ -214,10 +214,33 @@ async function resolvePlannerConflict(id,choice){
  toast(choice==='local'?'已排入本機版本待重新上傳':'已採用雲端版本');cloudSync?.scheduleSync(true);
 }
 
-/* V1.9.0 Single-UI GitHub Google Sheets sync using JSONP read and verified POST write. */
+/* V1.9.1: this public deployment URL is not a sync key. */
+const DEFAULT_DAYBOOK_GAS_URL = 'https://script.google.com/macros/s/AKfycbzQp3k0KMAUhfIAQdK59TPzjH0SbMRsnsoHX9fq-p23DRV8zlP1oKGB0EtfaoOjKLpZ/exec';
+/* V1.9.1 Single-UI GitHub Google Sheets sync using JSONP read and verified POST write. */
 class CloudSync {
  constructor(){this.config=null;this.key='';this.busy=false;this.state='local';this.message='單一記帳介面 · 尚未連接 Google 試算表';this.lastSync=null;this.timer=null;this.debounce=null;this.entryVersions={};this.catVersion=0;this.entryConflicts=new Map();this.catConflict=null;}
- async init(){this.config=await getMeta('gsheet_config');this.key=await getMeta('gsheet_key')||'';this.lastSync=await getMeta('gsheet_last_sync');this.entryVersions=await getMeta('gsheet_entry_versions')||{};this.catVersion=Number(await getMeta('gsheet_cat_version')||0);if(this.config&&this.config.url!=='gas-hosted'){$('#cloudUrl').value=this.config.url;$('#cloudKey').placeholder='已儲存金鑰；如不更換可留空';}this.renderUI();this.updateKeyHint();if(this.config&&this.config.url!=='gas-hosted'&&this.key&&navigator.onLine&&this.lastSync)this.scheduleSync(true);
+ async init(){
+  const savedConfig=await getMeta('gsheet_config');
+  this.config=savedConfig;
+  this.key=await getMeta('gsheet_key')||'';
+  this.lastSync=await getMeta('gsheet_last_sync');
+  this.entryVersions=await getMeta('gsheet_entry_versions')||{};
+  this.catVersion=Number(await getMeta('gsheet_cat_version')||0);
+  // The requested endpoint always appears in Settings, even if an older version
+  // saved a different URL. Keep the private key and all transactions untouched.
+  $('#cloudUrl').value=DEFAULT_DAYBOOK_GAS_URL;
+  this.previousConfiguredUrl='';
+  if(savedConfig&&savedConfig.url&&savedConfig.url!==DEFAULT_DAYBOOK_GAS_URL){
+    // Never start automatic synchronization against an old or unexpected cloud.
+    this.previousConfiguredUrl=savedConfig.url;
+    this.config=null;
+    this.state='local';
+    this.message='已帶入新的 Apps Script 網址；偵測到舊雲端設定，請先備份後按「只測試 Google 連線」確認切換';
+    this.lastSync=null;
+  }
+  if(this.key)$('#cloudKey').placeholder='已儲存金鑰；如不更換可留空';
+  this.renderUI();this.updateKeyHint();
+  if(this.config&&this.config.url===DEFAULT_DAYBOOK_GAS_URL&&this.key&&navigator.onLine&&this.lastSync)this.scheduleSync(true);
   window.addEventListener('online',()=>{if(this.lastSync)this.scheduleSync(true);});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&this.lastSync)this.scheduleSync(true);});this.timer=setInterval(()=>{if(!document.hidden&&this.lastSync)this.scheduleSync(true);},90000);
 
  }
@@ -235,7 +258,7 @@ class CloudSync {
      throw Error('請使用正式部署的 https://script.google.com/macros/s/.../exec 網址');
    return u.toString();
  }
- async configure(url,key){url=this.validUrl(url);if(!key)key=this.key;if(!/^[a-f0-9]{64}$/i.test(key))throw Error('請貼上 setupDaybook 產生的 64 碼同步金鑰');if(this.config&&this.config.url!==url&&!confirm('你正在更換雲端試算表。建議先下載 JSON 備份。要繼續嗎？'))return;
+ async configure(url,key){url=this.validUrl(url);if(!key)key=this.key;if(!/^[a-f0-9]{64}$/i.test(key))throw Error('請貼上 setupDaybook 產生的 64 碼同步金鑰');if(((this.config&&this.config.url!==url)||(this.previousConfiguredUrl&&this.previousConfiguredUrl!==url))&&!confirm('你正在更換雲端試算表。請先下載 JSON 備份。要繼續嗎？'))throw Error('已取消切換雲端服務；本機資料未變更');
   const newId='gapps:'+url.split('/').slice(-2)[0];
   if(linkedUserId!==newId){const old=linkedUserId;linkedUserId=newId;await setMeta('linked_user',newId);this.entryVersions={};this.catVersion=0;plannerVersions={};await setMeta('gsheet_entry_versions',{});await setMeta('gsheet_cat_version',0);await setMeta('planner_sync_versions_v15',{});await setMeta('gsheet_bootstrap_'+newId,false);await setMeta('cloud_categories_dirty',Boolean(records.length||plannerItems(planner).size));
     // Existing records are queued on FIRST connection, so none are silently discarded.
@@ -243,7 +266,7 @@ class CloudSync {
     for(const [id,payload] of plannerItems(planner))await storeOne('planner_outbox',{id,deleted:false,payload,base_version:0,change_id:guid()});
     if(old&&old!==newId)toast('已切換同步服務，請先檢查是否有舊版未同步資料');
   }
-  this.config={url};this.key=key;await setMeta('gsheet_config',this.config);await setMeta('gsheet_key',key);$('#cloudKey').value='';this.updateKeyHint();this.state='configured';this.message='已設定 Google Apps Script · 可以進行連線測試';this.renderUI();
+  this.config={url};this.previousConfiguredUrl='';this.key=key;await setMeta('gsheet_config',this.config);await setMeta('gsheet_key',key);$('#cloudKey').value='';this.updateKeyHint();this.state='configured';this.message='已設定 Google Apps Script · 可以進行連線測試';this.renderUI();
  }
  cleanKey(value){return String(value||'').replace(/\s+/g,'');}
  updateKeyHint(){const raw=$('#cloudKey').value, key=this.cleanKey(raw), hint=$('#cloudKeyHint');if(!hint)return;hint.className='cloud-key-hint';if(!key){hint.textContent=this.key?'已保存同步金鑰；留空將繼續沿用。':'尚未輸入金鑰。請從 Apps Script 執行記錄複製完整 64 碼。';return;}if(key.length!==64){hint.classList.add('error');hint.textContent=`目前 ${key.length} / 64 碼。請確認沒有複製到說明文字或漏掉字元。`;return;}if(!/^[a-f0-9]{64}$/i.test(key)){hint.classList.add('error');hint.textContent='長度是 64，但包含非 0–9／a–f 字元，請重新複製。';return;}hint.classList.add('ok');hint.textContent='✓ 金鑰長度與格式正確（尚未驗證伺服器是否接受）';}
