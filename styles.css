@@ -129,3 +129,73 @@ button.rank-button{display:block;width:100%;text-align:left;border:1px solid tra
 .cloud-diag-result.ok{background:#e9f8f2;color:#117d61}.cloud-diag-result.error{background:#fff0ef;color:#a83d43}
 .cloud-step .setting-actions button{flex:1;min-width:175px}
 @media(max-width:520px){.cloud-step .setting-actions button{width:100%;min-width:0}}
+
+
+/* Daybook V1.9.2 · real mobile-screen QA improvements */
+.matrix-swipe-hint{display:none}
+@media(max-width:900px){
+ .sidebar{box-shadow:none}
+ .sidebar.open{box-shadow:15px 0 70px #1c274333}
+}
+@media(max-width:660px){
+ html{-webkit-text-size-adjust:100%}
+ body{overflow-x:clip}
+ .main-shell,.main-content,.page{min-width:0}
+ .main-content{padding-bottom:calc(114px + env(safe-area-inset-bottom))}
+ .page-head{display:flex;flex-direction:column;align-items:stretch;gap:11px;min-height:0;margin-bottom:17px}
+ .page-head>.button{position:static;align-self:flex-start;max-width:100%;font-size:12px;min-height:42px;padding:10px 14px}
+ .year-controls,.precise-dates{min-width:0}
+ .year-controls label,.precise-dates label,.transaction-filters label{min-width:0}
+ .year-controls select,.precise-dates input,.transaction-filters select,.transaction-filters input{min-width:0;max-width:100%;width:100%}
+ .transaction-filters label,.form-grid label{font-size:12px}
+ .transaction-filters input,.transaction-filters select,.form-grid input,.form-grid select,.cloud-step input,.date-range input,.precise-dates input{font-size:16px;min-height:43px}
+ .top-search,.mobile-menu{min-width:42px;min-height:42px}
+ .topbar{gap:7px}.topbar-left,.topbar-actions{gap:8px;min-width:0}
+ .breadcrumbs{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+ .mobile-nav{height:calc(64px + env(safe-area-inset-bottom));bottom:0;padding:0 4px env(safe-area-inset-bottom);box-sizing:border-box}
+ .mobile-nav button{min-height:50px;min-width:0;flex:1;padding:5px 1px;gap:3px}
+ .mobile-fab{bottom:calc(82px + env(safe-area-inset-bottom));width:52px;height:52px;right:15px}
+ .matrix-swipe-hint{display:block;margin:0 0 10px;padding:10px 12px;border-radius:10px;background:#f1eeff;color:#6556c3;font-size:12px;line-height:1.6;font-weight:700}
+ #monthlyMatrix{border:1px solid #e9e9f5;border-radius:12px;overscroll-behavior-x:contain;scrollbar-width:thin}
+ #monthlyMatrix .matrix-table{min-width:904px}
+ #monthlyMatrix .matrix-table th:first-child,#monthlyMatrix .matrix-table td:first-child{position:sticky;left:0;z-index:2;background:#fff;box-shadow:2px 0 5px #15213b12;min-width:76px}
+ #monthlyMatrix .matrix-table th:first-child{background:#f6f7fb}
+ #entryModal .modal-sheet,#categoryModal .modal-sheet,#recurringModal .modal-sheet{width:100%;max-width:100%;max-height:calc(100dvh - 12px);border-radius:22px 22px 0 0;padding:18px 17px calc(12px + env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain}
+ #entryModal .modal-top,#categoryModal .modal-top,#recurringModal .modal-top{position:sticky;top:-18px;z-index:3;background:#fff;padding:10px 0 9px;margin-top:-10px;border-bottom:1px solid #f1f1fa}
+ #entryModal .entry-actions,#categoryModal .modal-actions,#recurringModal .modal-actions{position:sticky;bottom:calc(-12px - env(safe-area-inset-bottom));z-index:4;background:linear-gradient(180deg,#ffffffea,#fff 18%);padding:12px 0 calc(13px + env(safe-area-inset-bottom));margin:15px -3px -12px;border-top:1px solid #ecebf5;box-shadow:0 -8px 18px #16223e10;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+ #entryModal .entry-actions .button,#categoryModal .modal-actions .button,#recurringModal .modal-actions .button{white-space:normal;line-height:1.3;min-height:44px;min-width:0;padding:9px 7px;text-align:center}
+ #entryModal .entry-actions #saveEntryBtn{grid-column:span 2;grid-row:1}
+ #entryModal .entry-actions #saveContinueBtn{grid-column:2;grid-row:2}
+ #entryModal .entry-actions [data-close]{grid-column:1;grid-row:2}
+ #entryModal .entry-actions:has(#saveContinueBtn[hidden]) #saveEntryBtn{grid-column:2;grid-row:1}
+ #entryModal .entry-actions:has(#saveContinueBtn[hidden]) [data-close]{grid-column:1;grid-row:1}
+ #entryModal .entry-shortcuts{padding-bottom:4px}
+ .entry-chip-scroll{overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+ .entry-chip-scroll button{min-height:40px}
+ #reportDetailModal .report-detail-sheet{max-height:calc(100dvh - 8px);height:calc(100dvh - 8px)}
+ .report-detail-footer{padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+ .cloud-step .setting-actions{gap:8px}
+ .cloud-step .setting-actions .button{min-height:44px}
+ .cloud-panel,.setting-card,.stats-storage{min-width:0}
+ #cloudUrl,#cloudKey{width:100%;max-width:100%;min-width:0;font-size:16px}
+}
+@media(max-width:350px){
+ .main-content{padding-left:10px;padding-right:10px}
+ .panel{padding:14px}
+ .kpi-card{padding:12px 10px}
+ .kpi-value{font-size:17px}
+ .pill{padding:9px 10px}
+ .mobile-nav button{font-size:9px}
+ #entryModal .modal-sheet{padding-left:12px;padding-right:12px}
+ .donut-wrap{flex-basis:113px}
+ .donut{width:110px;height:110px}
+ .donut:after{inset:19px}
+}
+@media(prefers-reduced-motion:reduce){.page,.modal-sheet,.sidebar,.welcome-bubble span{animation:none!important;transition:none!important}}
+
+/* Landscape phones and short split-screen tablets: keep primary actions reachable */
+@media(max-height:500px) and (min-width:661px){
+ #entryModal,#categoryModal,#recurringModal{padding:6px;align-items:center}
+ #entryModal .modal-sheet,#categoryModal .modal-sheet,#recurringModal .modal-sheet{max-height:calc(100dvh - 12px);overflow-y:auto;overscroll-behavior:contain;padding:14px 17px}
+ #entryModal .modal-actions,#categoryModal .modal-actions,#recurringModal .modal-actions{position:sticky;bottom:-14px;z-index:4;background:#fff;border-top:1px solid #ecebf5;padding:10px 0 14px;margin:10px 0 -14px}
+}
