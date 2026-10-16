@@ -1,21 +1,39 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><base target="_top"></head><body>
+<p style="font:15px/1.7 system-ui,sans-serif;margin:1.6rem">拾光記帳 Google 橋接 V1.6.2 已啟動。這個頁面不會顯示或上傳私人同步金鑰；請返回記帳網站按「只測試 Google 連線」。</p>
 <script>
 (function () {
   'use strict';
-  // Allow only the explicit owner's site. A public iframe does not grant Sheet access.
   const ALLOWED_ORIGIN = <?!= JSON.stringify(allowedOrigin) ?>;
+  const inFlight = new Set();
+  // Google HTML Service adds its OWN sandboxed iframe. Our window.parent
+  // is the Google wrapper, not necessarily the owner's GitHub page.
+  function tellTop(data) {
+    if (window.top !== window) window.top.postMessage(data, ALLOWED_ORIGIN);
+  }
+  function announce() {
+    tellTop({type:'daybook-gas-ready',bridgeVersion:'1.6.2'});
+  }
   window.addEventListener('message', function (event) {
-    if (event.source !== window.parent || event.origin !== ALLOWED_ORIGIN) return;
-    const m = event.data;
-    if (!m || m.type !== 'daybook-gas-request' || !/^[a-z0-9-]{12,120}$/i.test(m.id || '')) return;
-    const answer = function(ok, value) {
-      event.source.postMessage({type:'daybook-gas-response', id:m.id, channel:m.channel, ok:ok, value:value}, event.origin);
+    // Only the whitelisted owner's TOP window may command the bridge.
+    if (event.source !== window.top || event.origin !== ALLOWED_ORIGIN) return;
+    const m=event.data;
+    if (!m || m.type!=='daybook-gas-request' || !/^[a-z0-9-]{12,120}$/i.test(m.id||'') || typeof m.channel!=='string') return;
+    if (inFlight.has(m.id)) return;
+    inFlight.add(m.id);
+    const answer=function(ok,value){
+      inFlight.delete(m.id);
+      tellTop({type:'daybook-gas-response',id:m.id,channel:m.channel,ok:ok,value:value});
     };
-    google.script.run.withSuccessHandler(v=>answer(true,v))
-      .withFailureHandler(e=>answer(false,{message:String(e && e.message || e)}))
-      .daybookApi(m.request);
+    try {
+      google.script.run.withSuccessHandler(v=>answer(true,v))
+        .withFailureHandler(e=>answer(false,{message:String(e&&e.message||e)}))
+        .daybookApi(m.request);
+    } catch(e){answer(false,{message:String(e&&e.message||e)});}
   });
+  // Repeat the handshake briefly; iframe onload may precede Google user frame.
+  announce();
+  [300,1000,2500,5000].forEach(ms=>setTimeout(announce,ms));
 }());
 </script>
 </body></html>

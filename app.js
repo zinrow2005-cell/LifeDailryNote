@@ -1,4 +1,4 @@
-/* 拾光記帳 v1.6.1 — local-first, zero runtime dependencies. No personal data is bundled. */
+/* 拾光記帳 v1.6.2 — local-first, zero runtime dependencies. No personal data is bundled. */
 (()=>{'use strict';
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const CATS=[['飲食','🍜','#8e76ed','#f0edff'],['其他雜費','🛒','#e99a67','#fff1e9'],['小孩相關','🧸','#df7ba3','#fff0f6'],['醫藥費','💊','#31aa9a','#e5f9f3'],['交通','🚗','#5099d8','#e8f3ff'],['保險費','🛡️','#d69b4c','#fff6e4'],['電費','⚡','#eeac4d','#fff6e4'],['GOGORO','🛵','#5fafd4','#e7f5ff'],['水費','💧','#5caff5','#e9f5ff'],['電信費','📱','#837ddf','#f0efff'],['旅遊費','✈️','#e78380','#fff0eb'],['衣服','👕','#a67dcb','#f7eeff'],['未分類','📌','#8490a5','#f0f3f8']];
@@ -220,17 +220,31 @@ async function resolvePlannerConflict(id,choice){
  * This avoids unsupported cross-origin fetch/CORS patterns. No key is bundled.
  */
 class CloudSync {
- constructor(){this.config=null;this.key='';this.busy=false;this.state='local';this.message='本機模式 · 尚未連接 Google 試算表';this.lastSync=null;this.frame=null;this.loaded=null;this.waiting=new Map();this.timer=null;this.debounce=null;this.channel=guid();this.entryVersions={};this.catVersion=0;this.entryConflicts=new Map();this.catConflict=null;}
+ constructor(){this.config=null;this.key='';this.busy=false;this.state='local';this.message='本機模式 · 尚未連接 Google 試算表';this.lastSync=null;this.frame=null;this.loaded=null;this.waiting=new Map();this.timer=null;this.debounce=null;this.channel=guid();this.bridgeTarget=null;this.bridgeReady=false;this.entryVersions={};this.catVersion=0;this.entryConflicts=new Map();this.catConflict=null;}
  async init(){this.config=await getMeta('gsheet_config');this.key=await getMeta('gsheet_key')||'';this.lastSync=await getMeta('gsheet_last_sync');this.entryVersions=await getMeta('gsheet_entry_versions')||{};this.catVersion=Number(await getMeta('gsheet_cat_version')||0);if(this.config){$('#cloudUrl').value=this.config.url;$('#cloudKey').placeholder='已儲存金鑰；如不更換可留空';}this.renderUI();this.updateKeyHint();if(this.config&&this.key&&navigator.onLine&&this.lastSync)this.scheduleSync(true);
   window.addEventListener('online',()=>{if(this.lastSync)this.scheduleSync(true);});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&this.lastSync)this.scheduleSync(true);});this.timer=setInterval(()=>{if(!document.hidden&&this.lastSync)this.scheduleSync(true);},90000);
-  window.addEventListener('message',e=>{if(!this.frame||e.source!==this.frame.contentWindow)return;const d=e.data;if(!d||d.type!=='daybook-gas-response'||d.channel!==this.channel)return;const w=this.waiting.get(d.id);if(!w)return;this.waiting.delete(d.id);clearTimeout(w.timer);d.ok?w.resolve(d.value):w.reject(Error(d.value?.message||'Apps Script 發生錯誤'));});
+  window.addEventListener('message',e=>{
+    if(!this.frame||!this.googleBridgeOrigin(e.origin)||!this.isBridgeWindow(e.source))return;
+    const d=e.data;if(!d)return;
+    if(d.type==='daybook-gas-ready'&&d.bridgeVersion==='1.6.2'){
+      this.bridgeReady=true;this.bridgeTarget=e.source;
+      // A Google HtmlService app is usually nested in one or more sandbox frames.
+      // Send any pending message to the real user-code frame, not just the outer wrapper.
+      if(this.pendingRequest)this.sendBridgeMessage(this.pendingRequest);
+      return;
+    }
+    if(d.type!=='daybook-gas-response'||d.channel!==this.channel)return;
+    const w=this.waiting.get(d.id);if(!w)return;
+    this.waiting.delete(d.id);clearTimeout(w.timer);this.pendingRequest=null;
+    d.ok?w.resolve(d.value):w.reject(Error(d.value?.message||'Apps Script 發生錯誤'));
+  });
  }
  bind(){
   $('#cloudConfigForm').addEventListener('submit',async e=>{e.preventDefault();try{await this.configure($('#cloudUrl').value.trim(),this.cleanKey($('#cloudKey').value));await this.diagnose();toast('連線驗證成功，開始同步帳目');await this.sync();}catch(err){if(!err.daybookReported)this.showError(err);}});
   $('#cloudDiagnose').onclick=async()=>{try{await this.configure($('#cloudUrl').value.trim(),this.cleanKey($('#cloudKey').value));await this.diagnose();}catch(err){if(!err.daybookReported)this.showError(err);}};
   $('#cloudKey').addEventListener('input',()=>this.updateKeyHint());
   $('#cloudSyncNow').onclick=()=>this.sync().catch(err=>this.showError(err));
-  $('#cloudLogout').onclick=async()=>{if(!confirm('停用此裝置的 Google 試算表同步？本機帳目仍保留。'))return;this.config=null;this.key='';this.frame?.remove();this.frame=null;this.loaded=null;for(const w of this.waiting.values()){clearTimeout(w.timer);w.reject(Error('已取消連線'));}this.waiting.clear();await setMeta('gsheet_config',null);await setMeta('gsheet_key',null);this.state='local';this.message='已停用此裝置同步 · 本機記帳仍可使用';this.renderUI();};
+  $('#cloudLogout').onclick=async()=>{if(!confirm('停用此裝置的 Google 試算表同步？本機帳目仍保留。'))return;this.config=null;this.key='';this.frame?.remove();this.frame=null;this.loaded=null;this.bridgeReady=false;this.bridgeTarget=null;this.pendingRequest=null;for(const w of this.waiting.values()){clearTimeout(w.timer);w.reject(Error('已取消連線'));}this.waiting.clear();await setMeta('gsheet_config',null);await setMeta('gsheet_key',null);this.state='local';this.message='已停用此裝置同步 · 本機記帳仍可使用';this.renderUI();};
   const box=$('#entryConflictList');box?.addEventListener('click',e=>{const b=e.target.closest('[data-entry-choice]');if(b)this.resolveConflict(b.dataset.entryId,b.dataset.entryChoice).catch(err=>this.showError(err));});
  }
  validUrl(url){url=url.replace(/\/+$/,'');if(!/^https:\/\/script\.google\.com\/macros\/s\/[a-z0-9_-]+\/exec$/i.test(url))throw Error('請填寫你自己部署的 Apps Script Web App /exec 網址');return url;}
@@ -247,7 +261,18 @@ class CloudSync {
  cleanKey(value){return String(value||'').replace(/\s+/g,'');}
  updateKeyHint(){const raw=$('#cloudKey').value, key=this.cleanKey(raw), hint=$('#cloudKeyHint');if(!hint)return;hint.className='cloud-key-hint';if(!key){hint.textContent=this.key?'已保存同步金鑰；留空將繼續沿用。':'尚未輸入金鑰。請從 Apps Script 執行記錄複製完整 64 碼。';return;}if(key.length!==64){hint.classList.add('error');hint.textContent=`目前 ${key.length} / 64 碼。請確認沒有複製到說明文字或漏掉字元。`;return;}if(!/^[a-f0-9]{64}$/i.test(key)){hint.classList.add('error');hint.textContent='長度是 64，但包含非 0–9／a–f 字元，請重新複製。';return;}hint.classList.add('ok');hint.textContent='✓ 金鑰長度與格式正確（尚未驗證伺服器是否接受）';}
  diagMessage(msg,type=''){const el=$('#cloudDiagResult');if(el){el.textContent=msg;el.className='cloud-diag-result'+(type?' '+type:'');}}
- resetBridge(){if(this.frame){this.frame.remove();this.frame=null;}this.loaded=null;for(const [id,w] of this.waiting){clearTimeout(w.timer);w.reject(Error('同步通道已重置，請重新測試'));}this.waiting.clear();}
+ googleBridgeOrigin(origin){try{const u=new URL(origin);return u.protocol==='https:'&&(u.hostname==='script.google.com'||u.hostname==='script.googleusercontent.com'||u.hostname.endsWith('.googleusercontent.com'));}catch{return false;}}
+ // Cross-origin WindowProxy exposes frame indices even though it hides document contents.
+ isBridgeWindow(source){if(!source||!this.frame)return false;const walk=(w,depth)=>{if(w===source)return true;if(depth>=5)return false;try{for(let i=0;i<Math.min(w.frames.length,16);i++)if(walk(w.frames[i],depth+1))return true;}catch{}return false;};return walk(this.frame.contentWindow,0);}
+ sendBridgeMessage(data){
+   if(!this.frame)return;
+   // The explicit ready message is the preferred route.
+   if(this.bridgeTarget){try{this.bridgeTarget.postMessage(data,'*');return;}catch{this.bridgeTarget=null;}}
+   // Fallback for load-order races: traverse only descendants of OUR iframe.
+   const send=(w,depth)=>{if(depth>5)return;try{w.postMessage(data,'*');}catch{}try{for(let i=0;i<Math.min(w.frames.length,16);i++)send(w.frames[i],depth+1);}catch{}};
+   send(this.frame.contentWindow,0);
+ }
+ resetBridge(){if(this.frame){this.frame.remove();this.frame=null;}this.loaded=null;this.bridgeTarget=null;this.bridgeReady=false;this.pendingRequest=null;for(const [id,w] of this.waiting){clearTimeout(w.timer);w.reject(Error('同步通道已重置，請重新測試'));}this.waiting.clear();}
  async diagnose(){if(this.busy)throw Error('目前正進行其他同步作業，請稍後再試');this.busy=true;this.state='busy';this.message='診斷中：只進行 Google 連線測試，不上傳或修改任何帳目';this.diagMessage('檢查 1/3：驗證網址與 64 碼金鑰格式…');this.renderUI();try{
   this.validUrl(this.config?.url||'');if(!/^[a-f0-9]{64}$/i.test(this.key||''))throw Error('同步金鑰格式錯誤；請重新貼上完整 64 碼（0–9、a–f）');
   this.diagMessage('檢查 2/3：載入 Google Apps Script 網頁橋接…');
@@ -266,9 +291,16 @@ class CloudSync {
   const id=guid(),request={action,key:this.key,...extra};
   return new Promise((resolve,reject)=>{
    const timeout=action==='ping'?20000:60000;
-   const timer=setTimeout(()=>{this.waiting.delete(id);this.resetBridge();reject(Error('階段3：Google 橋接頁面已載入，但 '+Math.round(timeout/1000)+' 秒內未回應。可能是舊版部署、ALLOWED_ORIGIN 不符、權限或第三方 Cookie 限制；請在無痕視窗直接打開 /exec 測試'));},timeout);
+   const timer=setTimeout(()=>{
+     this.waiting.delete(id);
+     const reason=!this.bridgeReady
+       ?'階段3：未收到 V1.6.2 Google 橋接的「已啟動」訊息。請確認 Bridge.html 已更新且部署新版本；也可能是 Google 不允許第三方 iframe 嵌入。'
+       :'階段4：已收到 V1.6.2 橋接啟動訊息，但 Google 服務未在時限內回應。請檢查 Apps Script「執行項目」是否有 daybookApi 執行失敗，並檢查瀏覽器 Cookie／權限。';
+     this.resetBridge();reject(Error(reason));
+   },timeout);
    this.waiting.set(id,{resolve,reject,timer});
-   this.frame.contentWindow.postMessage({type:'daybook-gas-request',id,channel:this.channel,request},'*');
+   this.pendingRequest={type:'daybook-gas-request',id,channel:this.channel,request};
+   this.sendBridgeMessage(this.pendingRequest);
   }).catch(err=>{const msg=String(err.message||err);if(msg.includes('同步金鑰不正確，或尚未執行 setupDaybook'))throw Error('階段3：Google 已回應，但金鑰被拒絕。請確認使用最近一次 setupDaybook 產生的金鑰，並確認 /exec 屬於同一個 Apps Script 專案。');throw err;});
  }
  async ping(){return this.bridgeRequest('ping');}

@@ -103,3 +103,13 @@ function daybookPush_(changes) {
 }
 function hashDaybook_(value) {return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,value).map(b=>('0'+(b&255).toString(16)).slice(-2)).join('');}
 function constantTimeEqual_(a,b){if(a.length!==b.length)return false;let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);return diff===0;}
+
+/** Safe configuration check: does not print or regenerate the sync key. */
+function checkDaybookSetup() {
+  const ss=SpreadsheetApp.openById(DAYBOOK_CONFIG.SHEET_ID);
+  const hash=PropertiesService.getScriptProperties().getProperty('DAYBOOK_KEY_HASH');
+  const tabs=['records','planner','meta'].map(kind=>DAYBOOK_CONFIG.PREFIX+kind);
+  const result={sheet: ss.getName(), syncKeyExists:Boolean(hash), tabs: tabs.map(name=>({name, exists:Boolean(ss.getSheetByName(name))})), allowedOrigin:DAYBOOK_CONFIG.ALLOWED_ORIGIN};
+  console.log(JSON.stringify(result));
+  return result;
+}

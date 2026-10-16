@@ -32,3 +32,11 @@
 - 分辨 URL、載入 Apps Script 橋接及 Google 伺服器回應階段；失敗後會重建橋接以支援重試。
 - Apps Script 新增 `checkDaybookSetup` 可安全查閱設定狀態（不顯示金鑰），但部署仍需依照指南更新到最新版本。
 - 網站版本更新維持原 IndexedDB，不自動刪除歷史資料；建議更新前先下載 JSON 備份。
+
+
+## V1.6.2 Google 沙箱通訊修正
+- 新增 Google Bridge ready handshake，修復只傳訊息給外層 iframe、內層沙箱收不到的問題。
+- 新增階段3（Bridge 尚未啟動）／階段4（已啟動但後端無回應）辨識。
+- GitHub 與 Apps Script 的 Bridge.html **都必須更新**，Apps Script 必須部署「新版本」。
+- 延用原 IndexedDB、金鑰與工作表，不需要重新設定或刪除帳目。
+- 此改動尚未於使用者私人 Apps Script 執行環境驗證，Google iframe 政策可能阻止跨站嵌入。
