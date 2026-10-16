@@ -4,9 +4,9 @@
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#14213c"><meta name="description" content="一個兼具快速記帳、分類、搜尋與跨年度統計的私人財務手帳。">
   <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="拾光記帳">
-  <title>拾光記帳 · Daybook V1.6</title>
+  <title>拾光記帳 · Daybook V1.6.1</title>
   <link rel="manifest" href="manifest.webmanifest"><link rel="icon" type="image/png" href="icons/icon-192.png"><link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=1.6.0">
+  <link rel="stylesheet" href="styles.css?v=1.6.1">
 </head>
 <body>
 <div class="app-shell">
@@ -55,15 +55,17 @@
 </section>
       <section class="page" id="page-categories"><div class="page-head"><div><p class="eyebrow">MAKE IT YOURS</p><h1>分類整齊，<em>生活有序。</em></h1><p class="page-desc">保留 Excel 原有分類，也能自行新增、改名。</p></div><button class="button button-primary" id="addCategoryBtn">＋ 新增分類</button></div><div class="category-mosaic" id="categoryCards"></div><p class="muted category-help">重新命名分類會同步套用到既有記錄；已有記錄的分類不提供直接刪除，避免遺失統計歸屬。</p></section>
       <section class="page" id="page-settings"><div class="page-head"><div><p class="eyebrow">YOUR DATA, YOUR CONTROL</p><h1>安心保存，<em>記錄不遺失。</em></h1><p class="page-desc">儲存在目前裝置上，可自行匯出備份與帶到其他裝置。</p></div></div><section class="panel cloud-panel" id="cloudPanel">
- <div class="cloud-head"><div class="cloud-emblem">☁</div><div><p class="section-kicker">GOOGLE SHEETS SYNC</p><h2>Google 試算表跨裝置同步 <span class="ver-pill">V1.6</span></h2><p class="muted">使用你自己的 Google Sheets + Apps Script，電腦、手機、平板共用交易、分類、預算與固定收支。未設定時仍然可以離線記帳。</p></div></div>
+ <div class="cloud-head"><div class="cloud-emblem">☁</div><div><p class="section-kicker">GOOGLE SHEETS SYNC</p><h2>Google 試算表跨裝置同步 <span class="ver-pill">V1.6.1</span></h2><p class="muted">使用你自己的 Google Sheets + Apps Script，電腦、手機、平板共用交易、分類、預算與固定收支。未設定時仍然可以離線記帳。</p></div></div>
  <div id="cloudState" class="cloud-state" role="status">本機模式 · 未連線</div>
  <div class="planner-sync-box"><div class="planner-sync-head"><strong>預算與固定收支同步</strong><span id="plannerSyncStatus" role="status">讀取設定…</span></div><div id="plannerConflictList" class="planner-conflict-list"></div><p class="muted">同一筆設定在兩台裝置同時變更時，不會直接覆蓋。請選擇要保留哪一個版本。</p></div>
  <div class="planner-sync-box"><div id="entryConflictList" class="planner-conflict-list"><p class="muted">目前沒有待處理的交易／分類衝突。</p></div></div>
  <div class="cloud-grid">
  <form id="cloudConfigForm" class="cloud-step"><h3><span class="cloud-step-num">1</span> 設定 Google Apps Script</h3><p>先依壓縮檔「Google試算表同步設定指南」部署 Apps Script，再填入 /exec 網址。同步金鑰只保存於你自己的裝置，**不要上傳 GitHub**。</p>
  <label>Apps Script Web App 網址<input id="cloudUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="url" required></label>
- <label>私人同步金鑰<input id="cloudKey" type="password" placeholder="輸入 setupDaybook 產生的 64 碼金鑰" autocomplete="off"></label>
- <button class="button button-primary" type="submit">儲存設定並測試同步</button></form>
+ <label>私人同步金鑰<input id="cloudKey" type="password" placeholder="輸入 setupDaybook 產生的 64 碼金鑰" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off"></label>
+ <div id="cloudKeyHint" class="cloud-key-hint" role="status">請貼上完整 64 碼同步金鑰；不更換可留空。</div>
+ <div class="setting-actions"><button class="button button-outline" id="cloudDiagnose" type="button">只測試 Google 連線（不上傳帳目）</button><button class="button button-primary" type="submit">儲存並開始同步</button></div>
+ <div id="cloudDiagResult" class="cloud-diag-result" role="status" aria-live="polite">先測試連線。測試成功後再正式同步歷史帳目。</div></form>
  <div class="cloud-step"><h3><span class="cloud-step-num">2</span> 跨裝置記帳</h3><p>在其他手機／平板開啟同一個 GitHub 網站，輸入相同的 Apps Script 網址與私人同步金鑰；兩端即可共用 Google 試算表資料。</p><p>同步不是持續即時推播：頁面開啟後、重新連線、返回頁面及按下「立即同步」時才會檢查。</p><p><strong>請先將 V1.5 帳目匯出為 JSON 備份</strong>，首次連線前確認你的原本資料已保留。</p></div>
  </div>
  <div class="cloud-toolbar"><span id="cloudAccountInfo">尚未設定 · 資料只儲存在這台裝置</span><div class="setting-actions"><button id="cloudSyncNow" class="button button-primary" disabled>↻ 立即同步</button><button id="cloudLogout" class="button button-outline" disabled>停用此裝置同步</button></div></div>
@@ -93,6 +95,6 @@
 </div>
 <div class="modal-layer" id="recurringModal" aria-hidden="true"><div class="modal-backdrop" data-close="recurringModal"></div><div class="modal-sheet compact-modal" role="dialog" aria-modal="true" aria-labelledby="recurringTitle"><div class="modal-top"><div><p class="section-kicker">RECURRING TEMPLATE</p><h2 id="recurringTitle">新增固定收支</h2></div><button class="close-modal" data-close="recurringModal" aria-label="關閉">×</button></div><form id="recurringForm"><input id="recurringId" type="hidden"><div class="form-grid"><label>收支類型<select id="recurringType"><option value="expense">支出</option><option value="income">收入</option></select></label><label>重複週期<select id="recurringInterval"><option value="1">每月</option><option value="2">每兩個月</option><option value="3">每季</option><option value="12">每年</option></select></label><label class="span-2">項目名稱<input id="recurringName" maxlength="80" placeholder="例如：住家電費" required></label><label>預計金額（NT$）<input id="recurringAmount" type="number" min="0.01" step="0.01" inputmode="decimal" required></label><label>分類<select id="recurringCategory" required></select></label><label class="span-2">首次日期<input id="recurringStart" type="date" required></label><label class="span-2">備註<input id="recurringMemo" maxlength="200" placeholder="例如：每兩個月繳一次，可入帳時修正金額"></label></div><div class="modal-actions"><button type="button" class="button button-outline" data-close="recurringModal">取消</button><button class="button button-primary" type="submit">儲存固定收支 ✓</button></div></form></div></div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div><input id="jsonFileInput" type="file" accept=".json,application/json" hidden><input id="csvFileInput" type="file" accept=".csv,text/csv" hidden>
-<script src="app.js?v=1.6.0" defer></script>
+<script src="app.js?v=1.6.1" defer></script>
 </body>
 </html>
