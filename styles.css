@@ -131,7 +131,7 @@ button.rank-button{display:block;width:100%;text-align:left;border:1px solid tra
 @media(max-width:520px){.cloud-step .setting-actions button{width:100%;min-width:0}}
 
 
-/* Daybook V1.9.2 · real mobile-screen QA improvements */
+/* Daybook V1.9.4 · real mobile-screen QA improvements */
 .matrix-swipe-hint{display:none}
 @media(max-width:900px){
  .sidebar{box-shadow:none}
@@ -198,4 +198,49 @@ button.rank-button{display:block;width:100%;text-align:left;border:1px solid tra
  #entryModal,#categoryModal,#recurringModal{padding:6px;align-items:center}
  #entryModal .modal-sheet,#categoryModal .modal-sheet,#recurringModal .modal-sheet{max-height:calc(100dvh - 12px);overflow-y:auto;overscroll-behavior:contain;padding:14px 17px}
  #entryModal .modal-actions,#categoryModal .modal-actions,#recurringModal .modal-actions{position:sticky;bottom:-14px;z-index:4;background:#fff;border-top:1px solid #ecebf5;padding:10px 0 14px;margin:10px 0 -14px}
+}
+
+
+/* V1.9.4 · Annual report ROC date overflow on phones/tablets.
+   Allow native Taiwanese-calendar date strings to use a full field width.
+   Values remain ISO yyyy-mm-dd internally; only layout/labels change. */
+#page-analytics .year-controls select{
+  max-width:100%;min-width:0;text-overflow:clip;
+}
+#page-analytics .precise-dates input[type="date"]{
+  box-sizing:border-box;display:block;width:100%;max-width:100%;min-width:0;
+  font-variant-numeric:tabular-nums;
+}
+@media (max-width:1024px){
+  #page-analytics .year-toolbar{min-width:0;overflow:visible}
+  #page-analytics .year-controls{
+    display:grid;grid-template-columns:minmax(0,1fr) 16px minmax(0,1fr);
+    align-items:end;column-gap:8px;row-gap:12px;width:100%;
+  }
+  #page-analytics .year-controls label{width:100%;min-width:0;max-width:none;font-size:12px;}
+  #page-analytics .year-controls>span{padding-bottom:13px;justify-self:center}
+  #page-analytics .year-controls select{width:100%;font-size:15px;min-height:46px;padding:9px 25px 9px 9px;}
+  #page-analytics .year-controls #applyYearBtn{grid-column:1 / -1;min-height:44px;width:100%;font-size:13px;}
+  #page-analytics .precise-dates{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:12px;align-items:end;width:100%;min-width:0;
+  }
+  #page-analytics .precise-dates-title{grid-column:1 / -1;min-width:0;width:100%;}
+  #page-analytics .precise-dates label{width:100%;min-width:0;max-width:100%;font-size:12px;}
+  #page-analytics .precise-dates input[type="date"]{
+    width:100%;max-width:none;min-width:0;min-height:47px;
+    padding:10px 9px;font-size:16px;line-height:1.35;
+    -webkit-appearance:auto;appearance:auto;
+  }
+  #page-analytics .precise-dates input[type="date"]::-webkit-datetime-edit{
+    padding:0;min-width:0;white-space:nowrap;letter-spacing:-.2px;
+  }
+  #page-analytics .precise-dates button{width:100%;min-width:0;min-height:44px;font-size:12px;white-space:normal;line-height:1.4}
+}
+@media (max-width:600px){
+  /* Single column for ROC dates: half-width fields truncate native iOS date UI. */
+  #page-analytics .precise-dates{grid-template-columns:minmax(0,1fr);gap:11px}
+  #page-analytics .precise-dates-title{grid-column:1}
+  #page-analytics .precise-dates input[type="date"]{font-size:16px;padding:10px 12px;}
+  #page-analytics .precise-dates button{grid-column:1;}
 }
