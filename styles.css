@@ -244,3 +244,53 @@ button.rank-button{display:block;width:100%;text-align:left;border:1px solid tra
   #page-analytics .precise-dates input[type="date"]{font-size:16px;padding:10px 12px;}
   #page-analytics .precise-dates button{grid-column:1;}
 }
+
+
+/* V1.9.5 · Daily income / expense navigator (independent of dashboard period) */
+.daily-panel{margin-bottom:18px;padding:22px 24px 18px;overflow:hidden}
+.daily-panel-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:17px}
+.daily-heading{min-width:0}
+.daily-heading h2{font-size:18px;margin:0 0 5px;font-weight:900;letter-spacing:-.3px}
+.daily-heading .muted{margin:0}
+.daily-date-controls{display:flex;align-items:center;justify-content:flex-end;gap:7px;min-width:0}
+.daily-arrow{width:40px;height:42px;min-width:40px;background:#f0efff;border:1px solid #e6e2fc;color:#6558d8;border-radius:12px;font-size:28px;line-height:1;font-weight:500;display:grid;place-items:center}
+.daily-arrow:disabled{opacity:.35;background:#f2f3f8;border-color:#eceef3;color:#828a9d;cursor:not-allowed}
+.daily-date-label{text-align:center;min-width:205px;display:flex;flex-direction:column;gap:2px;justify-content:center}
+.daily-date-main{font-size:15px;font-weight:900;color:#293653;white-space:nowrap}
+.daily-date-sub{font-size:11px;font-weight:650;color:#8c83cf}
+.daily-today-btn{min-height:42px;padding:0 12px;background:white;border:1px solid #e3e5f2;color:#7063d4;font-size:11px;border-radius:11px;font-weight:850;white-space:nowrap}
+.daily-today-btn:disabled{display:none}
+.daily-totals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.daily-total{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-height:125px;border:1px solid #e7e9f4;background:#fafaff;border-radius:16px;padding:15px 17px;text-align:left;color:#253451;transition:border-color .18s,box-shadow .18s,transform .18s}
+.daily-total:hover{border-color:#c6bffa;box-shadow:0 6px 20px #7165ee13;transform:translateY(-1px)}
+.daily-total:focus-visible{outline:3px solid #9588ff;outline-offset:2px}
+.daily-total-income{background:linear-gradient(115deg,#effcf7,#f9fffd);border-color:#d6f3e9}
+.daily-total-expense{background:linear-gradient(115deg,#fff2f4,#fffafb);border-color:#ffdee4}
+.daily-total-all{background:linear-gradient(115deg,#f2f0ff,#fcfbff);border-color:#e6e0ff}
+.daily-total-label{display:flex;align-items:center;gap:8px;color:#64718a;font-size:12px;font-weight:800}
+.daily-total-symbol{background:#fff;border-radius:8px;width:26px;height:26px;display:grid;place-items:center;font-size:16px;color:#7464df}
+.daily-total-income .daily-total-symbol{color:#1da889}.daily-total-expense .daily-total-symbol{color:#e06e80}
+.daily-total-value{font-size:clamp(18px,1.8vw,27px);line-height:1.35;letter-spacing:-.6px;overflow-wrap:anywhere;word-break:break-word}
+.daily-total-income .daily-total-value{color:#11876f}.daily-total-expense .daily-total-value{color:#c85870}
+.daily-total-foot{font-size:11px;color:#8793a7;font-weight:650;margin-top:auto}.daily-total-foot span{color:#7b6ded;font-size:16px;margin-left:3px}
+.daily-help{font-size:10px;color:#8793a7;margin:12px 0 0;line-height:1.5}
+@media(max-width:900px){.daily-panel-head{align-items:flex-start;flex-direction:column}.daily-date-controls{width:100%;justify-content:flex-start}}
+@media(max-width:660px){
+ .daily-panel{padding:16px 14px 13px;margin-bottom:13px;border-radius:16px}
+ .daily-panel-head{gap:14px;margin-bottom:12px}
+ .daily-heading h2{font-size:17px}
+ .daily-date-controls{display:grid;grid-template-columns:42px minmax(0,1fr) 42px;gap:8px}
+ .daily-arrow{width:42px;height:44px;min-width:0}
+ .daily-date-label{min-width:0}
+ .daily-date-main{font-size:clamp(12px,3.5vw,15px)}
+ .daily-today-btn{grid-column:1 / -1;min-height:33px;font-size:11px}
+ .daily-totals{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .daily-total{min-height:111px;padding:11px;border-radius:13px;gap:7px}
+ .daily-total-all{grid-column:1 / -1;min-height:83px}
+ .daily-total-value{font-size:clamp(16px,4.5vw,22px)}
+ .daily-total-label{font-size:11px;gap:6px}
+ .daily-total-foot{font-size:10px}
+ .daily-help{font-size:10px}
+}
+@media(max-width:350px){.daily-panel{padding:12px 10px}.daily-total{padding:10px 8px}.daily-total-value{font-size:16px}.daily-date-main{font-size:12px}}
+@media(prefers-reduced-motion:reduce){.daily-total{transition:none}}
