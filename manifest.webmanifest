@@ -1,8 +1,8 @@
 {
-  "name": "拾光記帳 Daybook 1.9.5",
+  "name": "拾光記帳 Daybook 1.9.6",
   "short_name": "拾光記帳",
   "description": "自己的日常收支、分類、快速搜尋與跨年度統計、每月預算與固定收支",
-  "start_url": "./index.html",
+  "start_url": "./index.html?version=1.9.6",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f6f7fb",

@@ -1,0 +1,12 @@
+{
+  "application": "拾光記帳 Daybook",
+  "version": "1.9.6",
+  "build": "v1.9.6-full-20261021",
+  "mode": "GitHub PWA",
+  "assets": [
+    "index.html",
+    "app.v1.9.6.js",
+    "styles.v1.9.6.css",
+    "sw.js"
+  ]
+}

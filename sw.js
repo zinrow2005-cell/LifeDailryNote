@@ -1,8 +1,29 @@
-// 拾光記帳 V1.9.5 本機版：cache-first 靜態檔案，其餘使用 network-first。
-const CACHE='daybook-public-v1.9.5';
-const SHELL=['./','./index.html','./styles.css?v=1.9.5','./app.js?v=1.9.5','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
-self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
-self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('daybook-public-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
-self.addEventListener('fetch',e=>{const r=e.request;if(r.method!=='GET')return;const u=new URL(r.url);if(u.origin!==self.location.origin)return;
-  if(r.mode==='navigate'){e.respondWith(fetch(r).catch(()=>caches.match('./index.html')));return;}
-  e.respondWith(caches.match(r).then(c=>c||fetch(r)));});
+/* 拾光記帳 Daybook V1.9.6：network-first，僅快取靜態網站資源，不處理 Google Apps Script 網域 */
+const CACHE='daybook-public-v1.9.6';
+const SHELL=['./index.html','./styles.v1.9.6.css','./app.v1.9.6.js','./manifest.webmanifest','./version.json','./check-update.html','./icons/icon-192.png','./icons/icon-512.png'];
+self.addEventListener('install',event=>{
+ event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
+});
+self.addEventListener('activate',event=>{
+ event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('daybook-public-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
+});
+self.addEventListener('fetch',event=>{
+ const request=event.request;
+ if(request.method!=='GET')return;
+ const url=new URL(request.url);
+ if(url.origin!==self.location.origin)return;
+ const isStatic=/\.(?:html|js|css|json|webmanifest|png)$/.test(url.pathname);
+ if(!isStatic && request.mode!=='navigate')return;
+ event.respondWith((async()=>{
+  try{
+   const response=await fetch(request,{cache:'no-store'});
+   if(response.ok){const cache=await caches.open(CACHE);await cache.put(request,response.clone());}
+   return response;
+  }catch(err){
+   const cached=await caches.match(request,{ignoreSearch:true});
+   if(cached)return cached;
+   if(request.mode==='navigate'){const fallback=await caches.match('./index.html');if(fallback)return fallback;}
+   throw err;
+  }
+ })());
+});

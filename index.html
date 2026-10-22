@@ -4,14 +4,15 @@
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icons/icon-192.png"><meta name="theme-color" content="#14213c"><meta name="description" content="一個兼具快速記帳、分類、搜尋與跨年度統計的私人財務手帳。">
   <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="拾光記帳">
-  <title>拾光記帳 · Daybook V1.9.5</title>
+  <title>拾光記帳 · Daybook V1.9.6</title>
+  <meta name="daybook-build" content="1.9.6-complete-20261021">
   
-  <link rel="stylesheet" href="./styles.css?v=1.9.5">
+  <link rel="stylesheet" href="./styles.v1.9.6.css">
 </head>
 <body>
 <div class="app-shell">
   <aside class="sidebar" id="sidebar">
-    <div class="brand"><div class="brand-icon">✦</div><div><div class="brand-name">拾光記帳<span> / Daybook</span></div><div class="brand-sub">Your little money journal · <strong>V1.9.5 · 一體式雲端記帳</strong></div></div></div>
+    <div class="brand"><div class="brand-icon">✦</div><div><div class="brand-name">拾光記帳<span> / Daybook</span></div><div class="brand-sub">Your little money journal · <strong>V1.9.6 · GitHub 完整版</strong></div></div></div>
     <div class="nav-label">MAIN MENU</div>
     <nav class="side-nav" aria-label="主要導覽">
       <button class="nav-item active" data-view="dashboard"><span class="nav-ico">▦</span><span>總覽儀表板</span></button>
@@ -68,8 +69,8 @@
 </section>
       <section class="page" id="page-categories"><div class="page-head"><div><p class="eyebrow">MAKE IT YOURS</p><h1>分類整齊，<em>生活有序。</em></h1><p class="page-desc">保留 Excel 原有分類，也能自行新增、改名。</p></div><button class="button button-primary" id="addCategoryBtn">＋ 新增分類</button></div><div class="category-mosaic" id="categoryCards"></div><p class="muted category-help">重新命名分類會同步套用到既有記錄；已有記錄的分類不提供直接刪除，避免遺失統計歸屬。</p></section>
       <section class="page" id="page-settings"><div class="page-head"><div><p class="eyebrow">YOUR DATA, YOUR CONTROL</p><h1>安心保存，<em>記錄不遺失。</em></h1><p class="page-desc">儲存在目前裝置上，可自行匯出備份與帶到其他裝置。</p></div></div><section class="panel cloud-panel" id="cloudPanel">
- <div class="cloud-head"><div class="cloud-emblem">☁</div><div><p class="section-kicker">GOOGLE SHEETS SYNC</p><h2>Google 試算表跨裝置同步 <span class="ver-pill">V1.9.5 · 同頁同步</span></h2><p class="muted">在目前這個 GitHub 記帳畫面直接同步 Google Sheets；不用另外開啟第二套系統。離線先記帳，恢復連線後再同步。</p></div></div>
- <div class="note-banner" id="syncTransportInfo" role="status"><strong>目前版本：V1.9.5</strong> ｜ 同步方式：GitHub 單頁直接讀寫 Google Sheets（無第二個記帳介面），寫入後會重新查詢確認。</div><div id="cloudState" class="cloud-state" role="status">本機模式 · 未連線</div>
+ <div class="cloud-head"><div class="cloud-emblem">☁</div><div><p class="section-kicker">GOOGLE SHEETS SYNC</p><h2>Google 試算表跨裝置同步 <span class="ver-pill">V1.9.6 · 同頁同步</span></h2><p class="muted">在目前這個 GitHub 記帳畫面直接同步 Google Sheets；不用另外開啟第二套系統。離線先記帳，恢復連線後再同步。</p></div></div>
+ <div class="note-banner" id="syncTransportInfo" role="status"><strong>目前版本：V1.9.6</strong> ｜ 同步方式：GitHub 單頁直接讀寫 Google Sheets（無第二個記帳介面），寫入後會重新查詢確認。</div><div id="cloudState" class="cloud-state" role="status">本機模式 · 未連線</div>
  <div class="planner-sync-box"><div class="planner-sync-head"><strong>預算與固定收支同步</strong><span id="plannerSyncStatus" role="status">讀取設定…</span></div><div id="plannerConflictList" class="planner-conflict-list"></div><p class="muted">同一筆設定在兩台裝置同時變更時，不會直接覆蓋。請選擇要保留哪一個版本。</p></div>
  <div class="planner-sync-box"><div id="entryConflictList" class="planner-conflict-list"><p class="muted">目前沒有待處理的交易／分類衝突。</p></div></div>
  <div class="cloud-grid">
@@ -83,7 +84,15 @@
  </div>
  <div class="cloud-toolbar"><span id="cloudAccountInfo">尚未設定 · 資料只儲存在這台裝置</span><div class="setting-actions"><button id="cloudSyncNow" class="button button-primary" disabled>↻ 立即同步</button><button id="cloudLogout" class="button button-outline" disabled>停用此裝置同步</button></div></div>
  <p class="cloud-warning">安全提醒：GitHub 跨網域同步需要將 Apps Script 網頁應用程式存取權設為「任何人」，但試算表本身必須保持私人，所有資料讀寫都會驗證 64 碼私人金鑰。這是持有金鑰即可存取的模式，不是 Google 帳號登入，也不是端到端加密。請勿公開金鑰，若不接受這種存取模式，建議使用只有本人可存取的 Apps Script 直連版本。</p>
- </section><div class="planner-local-note">分類管理仍可從電腦左側選單進入；手機如要修改分類，請點 <button type="button" class="text-link" data-go="categories">前往分類管理 →</button></div><div class="settings-grid"><section class="panel setting-card"><div class="setting-icon purple">⇩</div><h2>完整 JSON 備份</h2><p>包含每筆記帳、自訂分類、預算與固定收支模板，適合定期備份、換裝置或跨裝置搬移。</p><div class="setting-actions"><button class="button button-primary" id="exportJsonBtn">下載完整備份</button><button class="button button-outline" id="importJsonBtn">匯入備份檔</button></div></section><section class="panel setting-card"><div class="setting-icon peach">▤</div><h2>Excel 友善 CSV</h2><p>匯出全部交易，可用 Excel 開啟，適合存檔、列印或其他分析。</p><div class="setting-actions"><button class="button button-soft" id="exportAllCsvBtn">匯出所有 CSV</button><button class="button button-outline" id="importCsvBtn">匯入 CSV</button></div></section><section class="panel setting-card privacy-card"><div class="setting-icon green">◈</div><h2>隱私與裝置說明</h2><p>本機記帳預設不會上傳。在上方啟用 Google 試算表同步；已載入的 GitHub PWA 可以離線記帳，恢復網路後待同步記錄才會上傳。手機瀏覽器的儲存限制可能影響本機資料，請定期匯出 JSON 備份。</p><div class="note-banner">⚠ 刪除瀏覽器網站資料可能清除記帳；建議定期下載備份。</div></section><section class="panel setting-card"><div class="setting-icon blue">✦</div><h2>體驗與資料管理</h2><p>第一次使用可以先載入虛構的示範記帳體驗，匯入你的備份時可選擇覆蓋。</p><div class="setting-actions"><button class="button button-outline" id="demoBtn">加入示範資料</button><button class="button button-danger" id="deleteAllBtn">清空本機資料</button></div></section></div><section class="panel stats-storage"><div><p class="section-kicker">LOCAL STORAGE</p><h2>目前資料概況</h2></div><div class="storage-numbers" id="storageNumbers"></div></section><div class="help-footer"><strong>如何在手機／平板使用？</strong> 將這個網站加入主畫面即可像 App 一樣開啟；初次進入需網路，GitHub 版支援 PWA 離線快取；第一次開啟仍需要網路。iPhone / iPad 可以在 Safari 使用「分享 → 加入主畫面」，但不同裝置的支援程度可能不同。</div></section>
+ </section>
+<section class="panel release-panel" aria-labelledby="releaseTitle">
+ <div class="release-head"><div><p class="section-kicker">APP RELEASE & DEPLOYMENT</p><h2 id="releaseTitle">版本更新驗證</h2></div><span class="release-pill" id="loadedBuildTag">V1.9.6</span></div>
+ <p>這裡顯示本頁已載入的程式版本，並可核對 GitHub Pages 線上版本。只有網頁程式會更新；不會清除 IndexedDB 帳目或 Google 同步金鑰。</p>
+ <div id="releaseCheckStatus" class="release-status" role="status" aria-live="polite">目前載入：V1.9.6。尚未檢查線上版本。</div>
+ <div class="setting-actions"><button class="button button-outline" type="button" id="checkOnlineRelease">檢查 GitHub 線上版本</button><button class="button button-primary" type="button" id="forceLatestRelease">重新載入最新版（不刪帳目）</button><a class="button button-soft" href="./check-update.html" target="_blank" rel="noopener">開啟獨立版本檢查</a></div>
+ <p class="muted">更新完成後，如果仍顯示舊版，先確認上傳的檔案是否直接放在 GitHub Pages 發布根目錄。不要按「清除網站資料」。</p>
+</section>
+<div class="planner-local-note">分類管理仍可從電腦左側選單進入；手機如要修改分類，請點 <button type="button" class="text-link" data-go="categories">前往分類管理 →</button></div><div class="settings-grid"><section class="panel setting-card"><div class="setting-icon purple">⇩</div><h2>完整 JSON 備份</h2><p>包含每筆記帳、自訂分類、預算與固定收支模板，適合定期備份、換裝置或跨裝置搬移。</p><div class="setting-actions"><button class="button button-primary" id="exportJsonBtn">下載完整備份</button><button class="button button-outline" id="importJsonBtn">匯入備份檔</button></div></section><section class="panel setting-card"><div class="setting-icon peach">▤</div><h2>Excel 友善 CSV</h2><p>匯出全部交易，可用 Excel 開啟，適合存檔、列印或其他分析。</p><div class="setting-actions"><button class="button button-soft" id="exportAllCsvBtn">匯出所有 CSV</button><button class="button button-outline" id="importCsvBtn">匯入 CSV</button></div></section><section class="panel setting-card privacy-card"><div class="setting-icon green">◈</div><h2>隱私與裝置說明</h2><p>本機記帳預設不會上傳。在上方啟用 Google 試算表同步；已載入的 GitHub PWA 可以離線記帳，恢復網路後待同步記錄才會上傳。手機瀏覽器的儲存限制可能影響本機資料，請定期匯出 JSON 備份。</p><div class="note-banner">⚠ 刪除瀏覽器網站資料可能清除記帳；建議定期下載備份。</div></section><section class="panel setting-card"><div class="setting-icon blue">✦</div><h2>體驗與資料管理</h2><p>第一次使用可以先載入虛構的示範記帳體驗，匯入你的備份時可選擇覆蓋。</p><div class="setting-actions"><button class="button button-outline" id="demoBtn">加入示範資料</button><button class="button button-danger" id="deleteAllBtn">清空本機資料</button></div></section></div><section class="panel stats-storage"><div><p class="section-kicker">LOCAL STORAGE</p><h2>目前資料概況</h2></div><div class="storage-numbers" id="storageNumbers"></div></section><div class="help-footer"><strong>如何在手機／平板使用？</strong> 將這個網站加入主畫面即可像 App 一樣開啟；初次進入需網路，GitHub 版支援 PWA 離線快取；第一次開啟仍需要網路。iPhone / iPad 可以在 Safari 使用「分享 → 加入主畫面」，但不同裝置的支援程度可能不同。</div></section>
     </main>
   </div>
 </div>
@@ -108,6 +117,6 @@
 </div>
 <div class="modal-layer" id="recurringModal" aria-hidden="true"><div class="modal-backdrop" data-close="recurringModal"></div><div class="modal-sheet compact-modal" role="dialog" aria-modal="true" aria-labelledby="recurringTitle"><div class="modal-top"><div><p class="section-kicker">RECURRING TEMPLATE</p><h2 id="recurringTitle">新增固定收支</h2></div><button class="close-modal" data-close="recurringModal" aria-label="關閉">×</button></div><form id="recurringForm"><input id="recurringId" type="hidden"><div class="form-grid"><label>收支類型<select id="recurringType"><option value="expense">支出</option><option value="income">收入</option></select></label><label>重複週期<select id="recurringInterval"><option value="1">每月</option><option value="2">每兩個月</option><option value="3">每季</option><option value="12">每年</option></select></label><label class="span-2">項目名稱<input id="recurringName" maxlength="80" placeholder="例如：住家電費" required></label><label>預計金額（NT$）<input id="recurringAmount" type="number" min="0.01" step="0.01" inputmode="decimal" required></label><label>分類<select id="recurringCategory" required></select></label><label class="span-2">首次日期<input id="recurringStart" type="date" required></label><label class="span-2">備註<input id="recurringMemo" maxlength="200" placeholder="例如：每兩個月繳一次，可入帳時修正金額"></label></div><div class="modal-actions"><button type="button" class="button button-outline" data-close="recurringModal">取消</button><button class="button button-primary" type="submit">儲存固定收支 ✓</button></div></form></div></div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div><input id="jsonFileInput" type="file" accept=".json,application/json" hidden><input id="csvFileInput" type="file" accept=".csv,text/csv" hidden>
-<script src="./app.js?v=1.9.5" defer></script>
+<script src="./app.v1.9.6.js" defer></script>
 </body>
 </html>
