@@ -1,12 +1,12 @@
 {
   "application": "拾光記帳 Daybook",
-  "version": "1.9.6",
-  "build": "v1.9.6-full-20261021",
+  "version": "1.9.7",
+  "build": "v1.9.7-daily-drill-20261022",
   "mode": "GitHub PWA",
   "assets": [
     "index.html",
-    "app.v1.9.6.js",
-    "styles.v1.9.6.css",
+    "app.v1.9.7.js",
+    "styles.v1.9.7.css",
     "sw.js"
   ]
 }
