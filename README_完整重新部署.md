@@ -1,42 +1,13 @@
-# 拾光記帳 Daybook V1.9.7 — 完整重整與更新診斷版
+# Daybook V1.9.8｜完整 GitHub Pages 更新流程
 
-## 這一包是完整網站，而不是增量補丁
+1. 使用既有 V1.9.7 頁面匯出完整 JSON 備份，妥善保存在電腦。保留原 ZIP 以利回退。
+2. 開啟 GitHub Repository → Settings → Pages，確認 Build and deployment 的分支與資料夾 (`/(root)` 或 `/docs`)。
+3. 將 V1.9.8 ZIP 解壓縮後所有網站檔案上傳到該資料夾**根層**，不是上傳 ZIP 到網頁目錄，也不要多一層資料夾。
+4. 確認 `index.html` 同層包含 `app.v1.9.8.js`、`styles.v1.9.8.css`、`version.json`、`sw.js`、`check-update.html`；同時上傳 `icons/`。
+5. GitHub Actions / Pages 顯示部署完成後，在網站根網址後開 `/check-update.html`，確定版本 1.9.8。若顯示 404，表示發布位置不正確；請先核對，不要清除本機記帳。
+6. 進入記帳頁 → 預算與固定收支 → 編輯電信模板 → 設定終止日；或按「更換方案」一次建新舊兩筆。
+7. 先檢查原先已入帳交易的總筆數與金額，然後測試待入帳清單只出現有效方案，最後確認雲端同步。
 
-**請上傳 ZIP 解壓縮後「根目錄的全部內容」**到原本 GitHub Pages 所使用的發布位置。`index.html` 必須直接位於發布根目錄，不要把整個 `拾光記帳_Daybook...` 資料夾放在 repository 內。原本的雲端 Apps Script 不需要變更。
+保留與原始相同的 Google Apps Script URL 與本機同步金鑰；此版**不用修改或重新部署 Apps Script**。
 
-檔案：
-- `index.html`：完整記帳介面，畫面標示 V1.9.7，包含每日收支、前一天／下一天（最多今天）、總覽／明細／報表／預算／分類／設定。
-- `app.v1.9.7.js`：所有記帳功能與既有 Google Sheets 同頁同步程式。
-- `styles.v1.9.7.css`：全套桌機／平板／手機樣式。
-- `sw.js`：新版離線快取，改為在線時優先讀取網路，避免持續停在舊版。
-- `manifest.webmanifest`、`icons/`：PWA。
-- `version.json`：公開版本檢查標記（不含私密金鑰）。
-- `check-update.html`：獨立的發布版本驗證頁。
-
-**不包含任何私人帳目或同步金鑰。** 原本資料在瀏覽器 IndexedDB，更新程式不會覆蓋該資料，也沒有修改同步資料庫結構。
-
-## 正確重新上傳 GitHub（特別重要）
-
-1. 在目前網站的「資料備份與設定」先下載完整 JSON，另外妥善保留備份。
-2. 到 GitHub repository → Settings → Pages 確認「Build and deployment」的來源與路徑，例如 `main / (root)` 或 `main / docs`。
-3. 將本 ZIP 解壓縮後的 **全部檔案和 icons 子目錄**上傳到 Pages 真正指定的發布目錄。若之前放了另一層子資料夾，請改為直接上傳目錄內容。
-4. 在 repository 的 Actions / Pages 部署紀錄確認發布完成（成功狀態）。
-5. 用無痕視窗開啟 `https://你的網站路徑/check-update.html?check=196`。應顯示 `V1.9.7`。如果 404，代表部署位置錯誤，先不要處理快取。
-6. 再開啟 `https://你的網站路徑/version.json?check=196`，應包含 `"version":"1.9.6"`（排版中可能有空格）。
-7. 最後回原本 GitHub 記帳網址，確認左側 `V1.9.7 · GitHub 完整版`，進入「資料備份與設定」的「版本更新驗證」檢查。
-8. 若檢查頁是 V1.9.7 但主頁還是舊版，按新版的「重新載入最新版（不刪帳目）」；舊版看不到此按鈕時可以關閉已安裝 PWA 後重新開啟，或用 Chrome 無痕視窗確認新版已發布。
-
-**不要使用 Chrome 的「清除網站資料」「清除儲存空間」**，這會傷及 IndexedDB 帳目。不要重設 Apps Script 私人金鑰。
-
-## 版本不更新的快速判斷
-
-| 網站開啟狀況 | 原因與處理 |
-| --- | --- |
-| `check-update.html` 404 | ZIP 未上傳到 Pages 發布目錄、尚未部署或網站路徑錯誤 |
-| `check-update.html` V1.9.7；`version.json` V1.9.7；主頁舊版 | 快取／已安裝 PWA 仍載入舊 HTML，可做程式快取更新，不要清除資料 |
-| `version.json` V1.9.7；JS 404 | 新的版本化 JavaScript / CSS 沒有上傳完整 |
-| 主頁 V1.9.7，但帳目是空的 | 可能換了網址、子目錄、裝置或瀏覽器儲存空間；不要繼續匯入／同步前先確認備份 |
-
-## 測試與保留範圍
-
-此次保留 V1.9.5 每日收支與舊有功能，只調整完整發布檔名、更新檢查與服務工作者的網路優先載入策略。已核對舊版資料庫名稱、同步程式與各功能保留。正式 Google Sheets 同步需要部署後在你的裝置上測試，未宣稱實際連過你的私人 Google 後端。
+如果曾把同一帳單用「新增一筆記帳」手動記錄、且沒有 recurringKey，該交易仍會保留，系統也無法推斷它是某模板的已入帳期別；請逐筆核對，不要直接再次按「確認入帳」。

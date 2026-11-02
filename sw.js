@@ -1,6 +1,6 @@
-/* 拾光記帳 Daybook V1.9.7：network-first，僅快取靜態網站資源，不處理 Google Apps Script 網域 */
-const CACHE='daybook-public-v1.9.7';
-const SHELL=['./index.html','./styles.v1.9.7.css','./app.v1.9.7.js','./manifest.webmanifest','./version.json','./check-update.html','./icons/icon-192.png','./icons/icon-512.png'];
+/* 拾光記帳 Daybook V1.9.8：network-first，僅快取靜態網站資源，不處理 Google Apps Script 網域 */
+const CACHE='daybook-public-v1.9.8';
+const SHELL=['./index.html','./styles.v1.9.8.css','./app.v1.9.8.js','./manifest.webmanifest','./version.json','./check-update.html','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
 });
